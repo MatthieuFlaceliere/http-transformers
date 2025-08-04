@@ -1,5 +1,5 @@
 /*
- * @adonisjs/core
+ * @adonisjs/http-transformers
  *
  * (c) AdonisJS
  *
@@ -7,7 +7,7 @@
  * file that was distributed with this source code.
  */
 
-import { RuntimeException } from '@adonisjs/core/exceptions'
+import { RuntimeException } from '@poppinss/exception'
 
 import { Item } from './item.js'
 import { Maybe } from './maybe.js'

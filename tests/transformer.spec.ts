@@ -1,5 +1,5 @@
 /*
- * @adonisjs/core
+ * @adonisjs/http-transformers
  *
  * (c) AdonisJS
  *
@@ -8,8 +8,7 @@
  */
 
 import { test } from '@japa/runner'
-import { Logger } from '@adonisjs/core/logger'
-import { Container, inject } from '@adonisjs/core/container'
+import { Container, inject } from '@adonisjs/fold'
 
 import { transform } from '../src/transform.js'
 import { BaseTransformer } from '../src/base_transformer.js'
@@ -978,6 +977,10 @@ test.group('Transformer', () => {
       declare fullName: string | null
       declare email: string
     }
+    class Logger {
+      level: string = 'info'
+    }
+
     class UserTransformer extends BaseTransformer<User> {
       @inject()
       toObject(logger: Logger) {
@@ -996,7 +999,7 @@ test.group('Transformer', () => {
     user.email = 'foo@bar.com'
 
     const container = new Container().createResolver()
-    container.bindValue(Logger, new Logger({}))
+    container.bindValue(Logger, new Logger())
     const userData = await transform(user, UserTransformer, 'toObject', container)
 
     assert.deepEqual(userData, {

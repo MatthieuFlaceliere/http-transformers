@@ -1,5 +1,5 @@
 /*
- * @adonisjs/core
+ * @adonisjs/http-transformers
  *
  * (c) AdonisJS
  *
@@ -7,8 +7,8 @@
  * file that was distributed with this source code.
  */
 
+import type { ContainerResolver } from '@adonisjs/fold'
 import { type RuntimeException } from '@poppinss/exception'
-import type { ContainerResolver } from '@adonisjs/core/container'
 
 import { transformData } from './helpers.js'
 import { type ExtractResourceVariants, type InferData, type Next } from './types.js'

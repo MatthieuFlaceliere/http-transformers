@@ -1,5 +1,5 @@
 /*
- * @adonisjs/http
+ * @adonisjs/http-transformers
  *
  * (c) AdonisJS
  *
