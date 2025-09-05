@@ -1,9 +1,9 @@
 {
-  "name": "@adonisjs/data",
-  "description": "",
-  "version": "",
+  "name": "@adonisjs/http-transformers",
+  "description": "Serialize rich data-types with support for defining relationships with other transformers",
+  "version": "1.0.0",
   "engines": {
-    "node": ">=20.6.0"
+    "node": ">=24.0.0"
   },
   "type": "module",
   "files": [
