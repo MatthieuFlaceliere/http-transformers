@@ -7,11 +7,11 @@
  * file that was distributed with this source code.
  */
 
+import { Container } from '@adonisjs/fold'
 import { RuntimeException } from '@poppinss/exception'
-import { Container, type ContainerResolver } from '@adonisjs/fold'
 
 import { transformData } from './helpers.js'
-import type { ExtractResourceVariants, InferData } from './types.js'
+import type { TransformFn } from './types.js'
 
 /**
  * Transform the input value using the transformer. The transform method
@@ -23,38 +23,7 @@ import type { ExtractResourceVariants, InferData } from './types.js'
  * All other values are treat as resource items and transformed using the
  * transformer.
  */
-export function transform<
-  Data extends ConstructorParameters<Transformer>[0],
-  Transformer extends { new (...args: any[]): any },
-  Variant extends string = 'toObject',
->(
-  data: Data,
-  transformer: Transformer,
-  variant?: Variant | ExtractResourceVariants<InstanceType<Transformer>>,
-  container?: ContainerResolver<any>
-): Promise<InferData<InstanceType<Transformer>, Variant>>
-export function transform<
-  Data extends ConstructorParameters<Transformer>[0],
-  Transformer extends { new (...args: any[]): any },
-  Variant extends string = 'toObject',
->(
-  data: Data[],
-  transformer: Transformer,
-  variant?: Variant | ExtractResourceVariants<InstanceType<Transformer>>,
-  container?: ContainerResolver<any>
-): Promise<InferData<InstanceType<Transformer>, Variant>[]>
-export function transform<
-  Data extends ConstructorParameters<Transformer>[0],
-  Transformer extends { new (...args: any[]): any },
-  Variant extends string = 'toObject',
->(
-  data: Data | Data[],
-  transformer: Transformer,
-  variant?: Variant,
-  container?: ContainerResolver<any>
-):
-  | Promise<InferData<InstanceType<Transformer>, Variant>>
-  | Promise<InferData<InstanceType<Transformer>, Variant>[]> {
+export const transform: TransformFn = (data, transformer, variant, container) => {
   if (Array.isArray(data)) {
     return Promise.all(
       data.map((row) => {
@@ -65,7 +34,7 @@ export function transform<
           0
         )
       })
-    ) as Promise<InferData<InstanceType<Transformer>, Variant>[]>
+    ) as ReturnType<TransformFn>
   }
 
   if (data === undefined || data === null) {
@@ -77,5 +46,5 @@ export function transform<
     new transformer(data),
     variant ?? 'toObject',
     0
-  ) as Promise<InferData<InstanceType<Transformer>, Variant>>
+  ) as any
 }

@@ -7,6 +7,9 @@
  * file that was distributed with this source code.
  */
 
+import { type Prettify } from '@poppinss/types'
+import { type ContainerResolver } from '@adonisjs/fold'
+
 import type { Item } from './item.js'
 import type { Collection } from './collection.js'
 
@@ -29,13 +32,6 @@ type JSONValues =
   | null
   | undefined
   | CanBeSerialized<any>
-
-/**
- * Helper to make sense of auto-generated types
- */
-export type Prettify<T> = {
-  [K in keyof T]: T[K]
-} & {}
 
 /**
  * Representation of a value object
@@ -183,3 +179,26 @@ export type InferData<
 > = Resource extends { [K in Variant]: (...args: any[]) => unknown }
   ? UnpackValues<Awaited<ReturnType<Resource[Variant]>>, MaxDepth, Depth>
   : never
+
+export type TransformFn = {
+  <
+    Data extends ConstructorParameters<Transformer>[0],
+    Transformer extends { new (...args: any[]): any },
+    Variant extends string = 'toObject',
+  >(
+    data: Data,
+    transformer: Transformer,
+    variant?: Variant | ExtractResourceVariants<InstanceType<Transformer>>,
+    container?: ContainerResolver<any>
+  ): Promise<InferData<InstanceType<Transformer>, Variant>>
+  <
+    Data extends ConstructorParameters<Transformer>[0],
+    Transformer extends { new (...args: any[]): any },
+    Variant extends string = 'toObject',
+  >(
+    data: Data[],
+    transformer: Transformer,
+    variant?: Variant | ExtractResourceVariants<InstanceType<Transformer>>,
+    container?: ContainerResolver<any>
+  ): Promise<InferData<InstanceType<Transformer>, Variant>[]>
+}
