@@ -10,7 +10,7 @@
 import type { RuntimeException } from '@poppinss/exception'
 import type { ContainerResolver } from '@adonisjs/fold'
 
-import { transformData } from './helpers.js'
+import { serialize } from './helpers.js'
 import type { ExtractResourceVariants, InferData, Next } from './types.js'
 
 /**
@@ -25,6 +25,28 @@ export class Item<
   #debuggingError: RuntimeException
   $type: 'item' = 'item'
 
+  /**
+   * Creates a new Item instance
+   *
+   * @param transformerData - The data item to be transformed
+   * @param transformer - Constructor for the transformer class
+   * @param maxDepth - Maximum depth for nested transformations
+   * @param variant - Variant method name to use for transformation
+   * @param debuggingError - Runtime exception for debugging purposes
+   * @param allowNullable - Whether null values are allowed
+   *
+   * @example
+   * ```ts
+   * const item = new Item(
+   *   userData,
+   *   UserTransformer,
+   *   1,
+   *   'toObject',
+   *   new RuntimeException(),
+   *   true
+   * )
+   * ```
+   */
   constructor(
     protected transformerData: any,
     protected transformer: { new (...args: any[]): Transformer },
@@ -39,6 +61,14 @@ export class Item<
   /**
    * Specify the depth of relationships to be resolved when creating
    * the object tree.
+   *
+   * @param value - Maximum depth level for nested transformations
+   *
+   * @example
+   * ```ts
+   * const user = UserTransformer.item(userData)
+   *   .depth(3) // Allow 3 levels of nested relationships
+   * ```
    */
   depth<T extends Next[number]>(value: T): Item<Transformer, T, Variant, Fallback> {
     return new Item(
@@ -53,6 +83,14 @@ export class Item<
 
   /**
    * Specify the variant to use for the relationship
+   *
+   * @param value - Name of the transformer variant method to use
+   *
+   * @example
+   * ```ts
+   * const user = UserTransformer.item(userData)
+   *   .useVariant('toSummary') // Use toSummary() instead of toObject()
+   * ```
    */
   useVariant<V extends ExtractResourceVariants<Transformer>>(
     value: V
@@ -70,6 +108,12 @@ export class Item<
   /**
    * Instruct item to disallow nullable values. An error will be
    * thrown if the value is null.
+   *
+   * @example
+   * ```ts
+   * const user = UserTransformer.item(userData)
+   *   .notNullable() // Throw error if userData is null
+   * ```
    */
   notNullable(): Item<Transformer, Depth, Variant, unknown> {
     return new Item(
@@ -83,11 +127,19 @@ export class Item<
   }
 
   /**
-   * Transforms the resources to plain a JSON object. The maxDepth and
-   * depth properties can be specified when transforming the collection
-   * as a relationship.
+   * Serializes the item data using the transformer
+   *
+   * @param container - Container resolver for dependency injection
+   * @param depth - Current depth level in the transformation tree
+   * @param maxDepth - Optional maximum depth override
+   *
+   * @example
+   * ```ts
+   * const user = UserTransformer.item(userData)
+   * const serialized = await user.serialize(container, 0, 2)
+   * ```
    */
-  transform(
+  serialize(
     container: ContainerResolver<any>,
     depth: number,
     maxDepth?: number
@@ -117,7 +169,7 @@ export class Item<
       throw this.#debuggingError
     }
 
-    return transformData(
+    return serialize(
       container,
       new this.transformer(this.transformerData),
       this.variant,

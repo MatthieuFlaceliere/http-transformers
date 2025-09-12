@@ -10,7 +10,7 @@
 import { Container } from '@adonisjs/fold'
 import { RuntimeException } from '@poppinss/exception'
 
-import { transformData } from './helpers.js'
+import { serialize } from './helpers.js'
 import type { TransformFn } from './types.js'
 
 /**
@@ -22,12 +22,29 @@ import type { TransformFn } from './types.js'
  *
  * All other values are treat as resource items and transformed using the
  * transformer.
+ *
+ * @param data - The data to transform (single item or array)
+ * @param transformer - Constructor for the transformer class
+ * @param variant - Optional variant method name (defaults to 'toObject')
+ * @param container - Optional container resolver for dependency injection
+ *
+ * @example
+ * ```ts
+ * // Transform single item
+ * const user = await transform(userData, UserTransformer, 'toObject')
+ *
+ * // Transform array of items
+ * const users = await transform([userData1, userData2], UserTransformer)
+ *
+ * // Using custom variant
+ * const userSummary = await transform(userData, UserTransformer, 'toSummary')
+ * ```
  */
 export const transform: TransformFn = (data, transformer, variant, container) => {
   if (Array.isArray(data)) {
     return Promise.all(
       data.map((row) => {
-        return transformData(
+        return serialize(
           container ?? new Container().createResolver(),
           new transformer(row),
           variant ?? 'toObject',
@@ -41,7 +58,7 @@ export const transform: TransformFn = (data, transformer, variant, container) =>
     throw new RuntimeException('Cannot transform null or undefined values')
   }
 
-  return transformData(
+  return serialize(
     container ?? new Container().createResolver(),
     new transformer(data),
     variant ?? 'toObject',

@@ -757,7 +757,7 @@ test.group('Transformer', () => {
     user.fullName = null
     user.email = 'foo@bar.com'
 
-    const userData = await UserTransformer.item(user).transform(new Container().createResolver(), 0)
+    const userData = await UserTransformer.item(user).serialize(new Container().createResolver(), 0)
     assert.deepEqual(userData, { id: 1, fullName: null, email: 'foo@bar.com' })
     expectTypeOf(userData).toEqualTypeOf<{
       id: number
@@ -787,7 +787,7 @@ test.group('Transformer', () => {
     user.fullName = null
     user.email = 'foo@bar.com'
 
-    const userData = await UserTransformer.collection([user]).transform(
+    const userData = await UserTransformer.collection([user]).serialize(
       new Container().createResolver(),
       0
     )
@@ -900,7 +900,7 @@ test.group('Transformer', () => {
 
     const userData = await UserTransformer.item(user)
       .useVariant('basicInfo')
-      .transform(new Container().createResolver(), 0)
+      .serialize(new Container().createResolver(), 0)
     assert.deepEqual(userData, {
       id: 1,
       fullName: null,
@@ -956,7 +956,7 @@ test.group('Transformer', () => {
 
     const userData = await UserTransformer.collection([user])
       .useVariant('basicInfo')
-      .transform(new Container().createResolver(), 0)
+      .serialize(new Container().createResolver(), 0)
     assert.deepEqual(userData, [
       {
         id: 1,

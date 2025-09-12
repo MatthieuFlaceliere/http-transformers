@@ -38,6 +38,20 @@ import { Collection } from './collection.js'
 export abstract class BaseTransformer<T> {
   /**
    * Specify a one-to-one relationship with a given transformer.
+   *
+   * @param data - The data to transform, can be wrapped in Maybe for optional values
+   *
+   * @example
+   * ```ts
+   * class UserTransformer extends BaseTransformer<User> {
+   *   toObject() {
+   *     return {
+   *       id: this.resource.id,
+   *       profile: UserTransformer.item(this.resource.profile)
+   *     }
+   *   }
+   * }
+   * ```
    */
   static item<Self extends { new (...args: any[]): any }>(
     this: Self,
@@ -75,6 +89,20 @@ export abstract class BaseTransformer<T> {
 
   /**
    * Specify a many relationship with a given transformer.
+   *
+   * @param data - Array of data to transform, can be wrapped in Maybe for optional values
+   *
+   * @example
+   * ```ts
+   * class UserTransformer extends BaseTransformer<User> {
+   *   toObject() {
+   *     return {
+   *       id: this.resource.id,
+   *       posts: PostTransformer.collection(this.resource.posts)
+   *     }
+   *   }
+   * }
+   * ```
    */
   static collection<Self extends { new (...args: any[]): any }>(
     this: Self,
@@ -103,11 +131,39 @@ export abstract class BaseTransformer<T> {
     return new Collection(unwrappedValue, this, 1, 'toObject', new RuntimeException())
   }
 
+  /**
+   * Create a new transformer instance with the provided resource data
+   *
+   * @param resource - The raw resource data to be transformed
+   *
+   * @example
+   * ```ts
+   * class UserTransformer extends BaseTransformer<User> {
+   *   constructor(user: User) {
+   *     super(user)
+   *   }
+   * }
+   * ```
+   */
   constructor(protected resource: T) {}
 
   /**
    * Wrap the value into an optional to not fail when the
    * collection or item data is undefined
+   *
+   * @param value - The value to wrap in a Maybe container
+   *
+   * @example
+   * ```ts
+   * class UserTransformer extends BaseTransformer<User> {
+   *   toObject() {
+   *     return {
+   *       id: this.resource.id,
+   *       profile: this.whenLoaded(this.resource.profile)
+   *     }
+   *   }
+   * }
+   * ```
    */
   whenLoaded<Value>(value: Value): Maybe<Value> {
     return new Maybe(value)
@@ -116,6 +172,18 @@ export abstract class BaseTransformer<T> {
   /**
    * Omits the given keys from the data-set. The return value is a
    * shallow copy of the original data-set.
+   *
+   * @param data - The source object to omit keys from
+   * @param keys - Array of keys to omit from the data object
+   *
+   * @example
+   * ```ts
+   * class UserTransformer extends BaseTransformer<User> {
+   *   toObject() {
+   *     return this.omit(this.resource, ['password', 'internalId'])
+   *   }
+   * }
+   * ```
    */
   omit<Data extends Record<string, any>, Keys extends keyof Data>(
     data: Data,
@@ -129,8 +197,20 @@ export abstract class BaseTransformer<T> {
   }
 
   /**
-   * Given the given keys from the data-set. The return value is a
-   * shallow copy of the original data-set.
+   * Picks the given keys from the data-set. The return value is a
+   * shallow copy containing only the specified keys.
+   *
+   * @param data - The source object to pick keys from
+   * @param keys - Array of keys to pick from the data object
+   *
+   * @example
+   * ```ts
+   * class UserTransformer extends BaseTransformer<User> {
+   *   toSummary() {
+   *     return this.pick(this.resource, ['id', 'name', 'email'])
+   *   }
+   * }
+   * ```
    */
   pick<Data extends Record<string, any>, Keys extends keyof Data>(
     data: Data,
@@ -144,7 +224,24 @@ export abstract class BaseTransformer<T> {
   }
 
   /**
-   * Conditionally compute a value
+   * Conditionally compute a value based on a boolean condition
+   *
+   * @param conditional - Boolean condition to evaluate
+   * @param resolver - Function that returns the value when condition is true
+   * @param fallback - Optional fallback value when condition is false
+   *
+   * @example
+   * ```ts
+   * class UserTransformer extends BaseTransformer<User> {
+   *   toObject() {
+   *     return {
+   *       id: this.resource.id,
+   *       name: this.resource.name,
+   *       isAdmin: this.when(this.resource.role === 'admin', () => true, false)
+   *     }
+   *   }
+   * }
+   * ```
    */
   when<Value, Fallback = undefined>(
     conditional: boolean,

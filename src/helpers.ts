@@ -17,17 +17,37 @@ import type { JSONDataTypes, ResourceData } from './types.js'
 
 /**
  * Checks if value is an object excluding Arrays and null values
+ *
+ * @param value - The value to check
+ *
+ * @example
+ * ```ts
+ * isObject({}) // true
+ * isObject([]) // false
+ * isObject(null) // false
+ * isObject("string") // false
+ * ```
  */
 export function isObject<T extends Record<string, any>>(value: unknown): value is T {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
 /**
- * Transforms data by invoking the transformer and further
- * serializing its return value. Return value of a
- * transformer should always be an object
+ * Serializes a transformer instance using the specified variant method
+ *
+ * @param container - Container resolver for dependency injection
+ * @param transformer - The transformer instance to serialize
+ * @param variant - Name of the variant method to call
+ * @param depth - Current depth level in the transformation tree
+ * @param maxDepth - Optional maximum depth limit
+ *
+ * @example
+ * ```ts
+ * const user = new UserTransformer(userData)
+ * const result = await serialize(container, user, 'toObject', 0, 3)
+ * ```
  */
-export async function transformData(
+export async function serialize(
   container: ContainerResolver<any>,
   transformer: Record<string, any>,
   variant: string,
@@ -44,7 +64,7 @@ export async function transformData(
   if (debug.enabled) {
     debug('serializing "%s" output %O', `${transformer.constructor.name}.${variant}`, input)
   }
-  return serialize(container, input, depth, maxDepth)
+  return serializeValues(container, input, depth, maxDepth)
 }
 
 /**
@@ -64,7 +84,26 @@ export async function transformData(
 //   return output
 // }
 
-export async function serialize(
+/**
+ * Recursively serializes values from a resource data object, handling nested
+ * Items and Collections appropriately
+ *
+ * @param container - Container resolver for dependency injection
+ * @param input - The resource data object containing values to serialize
+ * @param depth - Current depth level in the transformation tree
+ * @param maxDepth - Optional maximum depth limit
+ *
+ * @example
+ * ```ts
+ * const resourceData = {
+ *   id: 1,
+ *   user: UserTransformer.item(userData),
+ *   posts: PostTransformer.collection(postsData)
+ * }
+ * const result = await serializeValues(container, resourceData, 0, 2)
+ * ```
+ */
+export async function serializeValues(
   container: ContainerResolver<any>,
   input: ResourceData,
   depth: number,
@@ -77,7 +116,7 @@ export async function serialize(
       if (maxDepth && depth >= maxDepth) {
         continue
       } else {
-        output[key] = await value.transform(container, depth + 1, maxDepth)
+        output[key] = await value.serialize(container, depth + 1, maxDepth)
       }
     } else {
       /**

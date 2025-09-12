@@ -10,7 +10,7 @@
 import type { ContainerResolver } from '@adonisjs/fold'
 import { type RuntimeException } from '@poppinss/exception'
 
-import { transformData } from './helpers.js'
+import { serialize } from './helpers.js'
 import { type ExtractResourceVariants, type InferData, type Next } from './types.js'
 
 /**
@@ -25,6 +25,26 @@ export class Collection<
   #debuggingError: RuntimeException
   $type: 'collection' = 'collection'
 
+  /**
+   * Creates a new Collection instance
+   *
+   * @param transformerData - Array of data to be transformed
+   * @param transformer - Constructor for the transformer class
+   * @param maxDepth - Maximum depth for nested transformations
+   * @param variant - Variant method name to use for transformation
+   * @param debuggingError - Runtime exception for debugging purposes
+   *
+   * @example
+   * ```ts
+   * const collection = new Collection(
+   *   [user1, user2],
+   *   UserTransformer,
+   *   1,
+   *   'toObject',
+   *   new RuntimeException()
+   * )
+   * ```
+   */
   constructor(
     protected transformerData: any[] | undefined,
     protected transformer: { new (...args: any[]): Transformer },
@@ -38,6 +58,14 @@ export class Collection<
   /**
    * Specify the depth of relationships to be resolved when creating
    * the object tree.
+   *
+   * @param value - Maximum depth level for nested transformations
+   *
+   * @example
+   * ```ts
+   * const posts = PostTransformer.collection(userData.posts)
+   *   .depth(2) // Allow 2 levels of nested relationships
+   * ```
    */
   depth<T extends Next[number]>(value: T): Collection<Transformer, T, Variant> {
     return new Collection(
@@ -51,6 +79,14 @@ export class Collection<
 
   /**
    * Specify the variant to use for the relationship
+   *
+   * @param value - Name of the transformer variant method to use
+   *
+   * @example
+   * ```ts
+   * const users = UserTransformer.collection(userData)
+   *   .useVariant('toSummary') // Use toSummary() instead of toObject()
+   * ```
    */
   useVariant<V extends ExtractResourceVariants<Transformer>>(
     value: V
@@ -65,12 +101,19 @@ export class Collection<
   }
 
   /**
-   * Transforms the resources collection to plain JSON
-   * objects. The maxDepth and depth properties can
-   * be specified when transforming the collection
-   * as a relationship.
+   * Serializes the collection data using the transformer
+   *
+   * @param container - Container resolver for dependency injection
+   * @param depth - Current depth level in the transformation tree
+   * @param maxDepth - Optional maximum depth override
+   *
+   * @example
+   * ```ts
+   * const posts = PostTransformer.collection(userData.posts)
+   * const serialized = await posts.serialize(container, 0, 2)
+   * ```
    */
-  transform(
+  serialize(
     container: ContainerResolver<any>,
     depth: number,
     maxDepth?: number
@@ -92,7 +135,7 @@ export class Collection<
     return Promise.all(
       this.transformerData.map(
         (row) =>
-          transformData(
+          serialize(
             container,
             new this.transformer(row),
             this.variant,
