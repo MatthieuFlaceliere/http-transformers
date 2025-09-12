@@ -20,7 +20,7 @@ export class Item<
   Transformer extends Record<string, any>,
   Depth extends number,
   Variant extends string,
-  Fallback,
+  Fallback extends any = {},
 > {
   #debuggingError: RuntimeException
   $type: 'item' = 'item'

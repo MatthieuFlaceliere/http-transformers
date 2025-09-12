@@ -63,7 +63,14 @@ export abstract class BaseTransformer<T> {
       return undefined
     }
 
-    return new Item(unwrappedValue, this, 1, 'toObject', new RuntimeException(), true)
+    return new Item<InstanceType<Self>, 1, 'toObject', null>(
+      unwrappedValue,
+      this,
+      1,
+      'toObject',
+      new RuntimeException(),
+      true
+    )
   }
 
   /**
