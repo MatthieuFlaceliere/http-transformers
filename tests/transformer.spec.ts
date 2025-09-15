@@ -10,8 +10,8 @@
 import { test } from '@japa/runner'
 import { Container, inject } from '@adonisjs/fold'
 
-import { transform } from '../src/transform.js'
-import { BaseTransformer } from '../src/base_transformer.js'
+import { serialize } from '../src/serialize.ts'
+import { BaseTransformer } from '../src/base_transformer.ts'
 
 test.group('Transformer', () => {
   test('throw error when value is null', async ({ expectTypeOf }) => {
@@ -30,9 +30,13 @@ test.group('Transformer', () => {
       }
     }
 
-    const userData = await transform(null as any, UserTransformer)
-    expectTypeOf(userData).toEqualTypeOf<{ id: number; fullName: string | null; email: string }>()
-  }).throws('Cannot transform null or undefined values')
+    const userData = await serialize(UserTransformer.transform(null)!)
+    expectTypeOf(userData).toEqualTypeOf<{
+      id: number
+      fullName: string | null
+      email: string
+    }>()
+  }).throws('Cannot serialize an item with null value')
 
   test('throw error when value is undefined', async ({ expectTypeOf }) => {
     class User {
@@ -50,9 +54,67 @@ test.group('Transformer', () => {
       }
     }
 
-    const userData = await transform(undefined as any, UserTransformer)
+    const userData = await serialize(UserTransformer.transform(undefined as any)!)
+    expectTypeOf(userData).toEqualTypeOf<{
+      id: number
+      fullName: string | null
+      email: string
+    }>()
+  }).throws(
+    'Cannot transform undefined value. Use "this.whenLoaded(value)" to allow undefined values'
+  )
+
+  test('allow null values as a value of a top-level object', async ({ assert, expectTypeOf }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const userData = await serialize({
+      user: UserTransformer.transform(null),
+    })
+
+    assert.deepEqual(userData, { user: null })
+    expectTypeOf(userData).toEqualTypeOf<{
+      user: {
+        id: number
+        fullName: string | null
+        email: string
+      } | null
+    }>()
+  })
+
+  test('throw error when value is undefined', async ({ expectTypeOf }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const userData = await serialize(UserTransformer.transform(undefined as any)!)
     expectTypeOf(userData).toEqualTypeOf<{ id: number; fullName: string | null; email: string }>()
-  }).throws('Cannot transform null or undefined values')
+  }).throws(
+    'Cannot transform undefined value. Use "this.whenLoaded(value)" to allow undefined values'
+  )
 
   test('transform a value using a transformer', async ({ assert, expectTypeOf }) => {
     class User {
@@ -75,7 +137,7 @@ test.group('Transformer', () => {
     user.fullName = null
     user.email = 'foo@bar.com'
 
-    const userData = await transform(user, UserTransformer)
+    const userData = await serialize(UserTransformer.transform(user))
     assert.deepEqual(userData, { id: 1, fullName: null, email: 'foo@bar.com' })
     expectTypeOf(userData).toEqualTypeOf<{ id: number; fullName: string | null; email: string }>()
   })
@@ -85,6 +147,7 @@ test.group('Transformer', () => {
       declare id: number
       declare email: string
       declare isVerified: boolean
+      declare user: User
     }
 
     class User {
@@ -98,6 +161,7 @@ test.group('Transformer', () => {
         return {
           id: this.resource.id,
           email: this.resource.email,
+          user: UserTransformer.transform(this.resource.user),
           isVerified: this.resource.isVerified,
         }
       }
@@ -108,7 +172,7 @@ test.group('Transformer', () => {
         return {
           id: this.resource.id,
           fullName: this.resource.fullName,
-          emails: EmailTransformer.collection(this.resource.emails),
+          emails: EmailTransformer.transform(this.resource.emails),
         }
       }
     }
@@ -123,7 +187,7 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await transform(user, UserTransformer)
+    const userData = await serialize(UserTransformer.transform(user))
     assert.deepEqual(userData, {
       id: 1,
       fullName: null,
@@ -164,7 +228,7 @@ test.group('Transformer', () => {
         return {
           id: this.resource.id,
           fullName: this.resource.fullName,
-          emails: EmailTransformer.collection(this.resource.emails),
+          emails: EmailTransformer.transform(this.resource.emails),
         }
       }
     }
@@ -179,7 +243,7 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await transform([user], UserTransformer)
+    const userData = await serialize(UserTransformer.transform([user]))
     assert.deepEqual(userData, [
       {
         id: 1,
@@ -224,7 +288,7 @@ test.group('Transformer', () => {
         return {
           id: this.resource.id,
           fullName: this.resource.fullName,
-          emails: EmailTransformer.collection(this.resource.emails),
+          emails: EmailTransformer.transform(this.resource.emails),
         }
       }
     }
@@ -233,51 +297,10 @@ test.group('Transformer', () => {
     user.id = 1
     user.fullName = null
 
-    await transform(user, UserTransformer)
+    await serialize(UserTransformer.transform(user))
   }).throws(
-    'Cannot transform a collection with undefined value. Use "this.whenLoaded(value)" to allow undefined values'
+    'Cannot transform undefined value. Use "this.whenLoaded(value)" to allow undefined values'
   )
-
-  test('throw error when collection data is not an array', async () => {
-    class Email {
-      declare id: number
-      declare email: string
-      declare isVerified: boolean
-    }
-
-    class User {
-      declare id: number
-      declare fullName: string | null
-      declare emails: Email[]
-    }
-
-    class EmailTransformer extends BaseTransformer<Email> {
-      toObject() {
-        return {
-          id: this.resource.id,
-          email: this.resource.email,
-          isVerified: this.resource.isVerified,
-        }
-      }
-    }
-
-    class UserTransformer extends BaseTransformer<User> {
-      toObject() {
-        return {
-          id: this.resource.id,
-          fullName: this.resource.fullName,
-          emails: EmailTransformer.collection(this.resource.emails),
-        }
-      }
-    }
-
-    const user = new User()
-    user.id = 1
-    user.fullName = null
-    user.emails = new Email() as any
-
-    await transform(user, UserTransformer)
-  }).throws('Collection requires an array of values to transform. Instead received object')
 
   test('do not throw error when collection data is undefined and marked as optional', async ({
     assert,
@@ -310,7 +333,7 @@ test.group('Transformer', () => {
         return {
           id: this.resource.id,
           fullName: this.resource.fullName,
-          emails: EmailTransformer.collection(this.whenLoaded(this.resource.emails)),
+          emails: EmailTransformer.transform(this.whenLoaded(this.resource.emails)),
         }
       }
     }
@@ -319,7 +342,7 @@ test.group('Transformer', () => {
     user.id = 1
     user.fullName = null
 
-    const userData = await transform(user, UserTransformer)
+    const userData = await serialize(UserTransformer.transform(user))
     assert.deepEqual(userData, {
       id: 1,
       fullName: null,
@@ -355,7 +378,7 @@ test.group('Transformer', () => {
           id: this.resource.id,
           email: this.resource.email,
           isVerified: this.resource.isVerified,
-          user: UserTransformer.item(this.resource.user),
+          user: UserTransformer.transform(this.resource.user),
         }
       }
     }
@@ -365,7 +388,7 @@ test.group('Transformer', () => {
         return {
           id: this.resource.id,
           fullName: this.resource.fullName,
-          emails: EmailTransformer.collection(this.whenLoaded(this.resource.emails)),
+          emails: EmailTransformer.transform(this.whenLoaded(this.resource.emails)),
         }
       }
     }
@@ -380,7 +403,7 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await transform(user, UserTransformer)
+    const userData = await serialize(UserTransformer.transform(user))
     assert.deepEqual(userData, {
       id: 1,
       fullName: null,
@@ -413,7 +436,7 @@ test.group('Transformer', () => {
           id: this.resource.id,
           email: this.resource.email,
           isVerified: this.resource.isVerified,
-          user: UserTransformer.item(this.resource.user),
+          user: UserTransformer.transform(this.resource.user),
         }
       }
     }
@@ -423,7 +446,7 @@ test.group('Transformer', () => {
         return {
           id: this.resource.id,
           fullName: this.resource.fullName,
-          emails: EmailTransformer.collection(this.whenLoaded(this.resource.emails))?.depth(2),
+          emails: EmailTransformer.transform(this.whenLoaded(this.resource.emails))?.depth(2),
         }
       }
     }
@@ -438,7 +461,8 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await transform(user, UserTransformer)
+    const userData = await serialize(UserTransformer.transform(user))
+
     expectTypeOf(userData).toEqualTypeOf<{
       id: number
       fullName: string | null
@@ -450,12 +474,12 @@ test.group('Transformer', () => {
             user: {
               id: number
               fullName: string | null
-            } | null
+            }
           }[]
         | undefined
     }>()
   }).throws(
-    'Cannot transform an item with undefined value. Use "this.whenLoaded(value)" to allow undefined values'
+    'Cannot transform undefined value. Use "this.whenLoaded(value)" to allow undefined values'
   )
 
   test('resolve circular references upto 6 levels deep', async ({ assert, expectTypeOf }) => {
@@ -478,7 +502,7 @@ test.group('Transformer', () => {
           id: this.resource.id,
           email: this.resource.email,
           isVerified: this.resource.isVerified,
-          user: UserTransformer.item(this.resource.user),
+          user: UserTransformer.transform(this.resource.user),
         }
       }
     }
@@ -488,7 +512,7 @@ test.group('Transformer', () => {
         return {
           id: this.resource.id,
           fullName: this.resource.fullName,
-          emails: EmailTransformer.collection(this.whenLoaded(this.resource.emails))?.depth(6),
+          emails: EmailTransformer.transform(this.whenLoaded(this.resource.emails))?.depth(6),
         }
       }
     }
@@ -504,7 +528,7 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await transform(user, UserTransformer)
+    const userData = await serialize(UserTransformer.transform(user))
     assert.snapshot(userData).matchInline(`
       {
         "emails": [
@@ -571,13 +595,13 @@ test.group('Transformer', () => {
                             user: {
                               id: number
                               fullName: string | null
-                            } | null
+                            }
                           }[]
                         | undefined
-                    } | null
+                    }
                   }[]
                 | undefined
-            } | null
+            }
           }[]
         | undefined
     }>()
@@ -610,7 +634,7 @@ test.group('Transformer', () => {
         return {
           id: this.resource.id,
           fullName: this.resource.fullName,
-          email: EmailTransformer.item(this.resource.email),
+          email: EmailTransformer.transform(this.resource.email),
         }
       }
     }
@@ -620,7 +644,7 @@ test.group('Transformer', () => {
     user.fullName = null
     user.email = null
 
-    const userData = await transform(user, UserTransformer)
+    const userData = await serialize(UserTransformer.transform(user))
     assert.deepEqual(userData, { id: 1, fullName: null, email: null })
     expectTypeOf(userData).toEqualTypeOf<{
       id: number
@@ -632,59 +656,6 @@ test.group('Transformer', () => {
       } | null
     }>()
   })
-
-  test('throw error when item value is null when notNullable modifier is used', async ({
-    expectTypeOf,
-  }) => {
-    class Email {
-      declare id: number
-      declare email: string
-      declare isVerified: boolean
-    }
-    class User {
-      declare id: number
-      declare fullName: string | null
-      declare email: Email | null
-    }
-
-    class EmailTransformer extends BaseTransformer<Email> {
-      toObject() {
-        return {
-          id: this.resource.id,
-          email: this.resource.email,
-          isVerified: this.resource.isVerified,
-        }
-      }
-    }
-
-    class UserTransformer extends BaseTransformer<User> {
-      toObject() {
-        return {
-          id: this.resource.id,
-          fullName: this.resource.fullName,
-          email: EmailTransformer.item(this.resource.email).notNullable(),
-        }
-      }
-    }
-
-    const user = new User()
-    user.id = 1
-    user.fullName = null
-    user.email = null
-
-    const userData = await transform(user, UserTransformer)
-    expectTypeOf(userData).toEqualTypeOf<{
-      id: number
-      fullName: string | null
-      email: {
-        id: number
-        email: string
-        isVerified: boolean
-      }
-    }>()
-  }).throws(
-    'Cannot transform an item with null value. Remove "notNullable" modifier to allow null values'
-  )
 
   test('throw error when item value is undefined', async ({ expectTypeOf }) => {
     class Email {
@@ -713,7 +684,7 @@ test.group('Transformer', () => {
         return {
           id: this.resource.id,
           fullName: this.resource.fullName,
-          email: EmailTransformer.item(this.resource.email),
+          email: EmailTransformer.transform(this.resource.email),
         }
       }
     }
@@ -722,7 +693,7 @@ test.group('Transformer', () => {
     user.id = 1
     user.fullName = null
 
-    const userData = await transform(user, UserTransformer)
+    const userData = await serialize(UserTransformer.transform(user))
     expectTypeOf(userData).toEqualTypeOf<{
       id: number
       fullName: string | null
@@ -733,7 +704,7 @@ test.group('Transformer', () => {
       } | null
     }>()
   }).throws(
-    'Cannot transform an item with undefined value. Use "this.whenLoaded(value)" to allow undefined values'
+    'Cannot transform undefined value. Use "this.whenLoaded(value)" to allow undefined values'
   )
 
   test('transform as item', async ({ assert, expectTypeOf }) => {
@@ -757,13 +728,13 @@ test.group('Transformer', () => {
     user.fullName = null
     user.email = 'foo@bar.com'
 
-    const userData = await UserTransformer.item(user).serialize(new Container().createResolver(), 0)
+    const userData = await serialize(UserTransformer.transform(user))
     assert.deepEqual(userData, { id: 1, fullName: null, email: 'foo@bar.com' })
     expectTypeOf(userData).toEqualTypeOf<{
       id: number
       fullName: string | null
       email: string
-    } | null>()
+    }>()
   })
 
   test('transform as collection', async ({ assert, expectTypeOf }) => {
@@ -787,10 +758,7 @@ test.group('Transformer', () => {
     user.fullName = null
     user.email = 'foo@bar.com'
 
-    const userData = await UserTransformer.collection([user]).serialize(
-      new Container().createResolver(),
-      0
-    )
+    const userData = await serialize(UserTransformer.transform([user]))
     assert.deepEqual(userData, [{ id: 1, fullName: null, email: 'foo@bar.com' }])
     expectTypeOf(userData).toEqualTypeOf<
       {
@@ -835,7 +803,7 @@ test.group('Transformer', () => {
       toObject() {
         return {
           ...this.basicInfo(),
-          emails: EmailTransformer.collection(this.resource.emails),
+          emails: EmailTransformer.transform(this.resource.emails),
         }
       }
     }
@@ -844,7 +812,7 @@ test.group('Transformer', () => {
     user.id = 1
     user.fullName = null
 
-    const userData = await transform(user, UserTransformer, 'basicInfo')
+    const userData = await serialize(UserTransformer.transform(user).useVariant('basicInfo'))
     assert.deepEqual(userData, {
       id: 1,
       fullName: null,
@@ -889,7 +857,7 @@ test.group('Transformer', () => {
       toObject() {
         return {
           ...this.basicInfo(),
-          emails: EmailTransformer.collection(this.resource.emails),
+          emails: EmailTransformer.transform(this.resource.emails),
         }
       }
     }
@@ -898,17 +866,16 @@ test.group('Transformer', () => {
     user.id = 1
     user.fullName = null
 
-    const userData = await UserTransformer.item(user)
-      .useVariant('basicInfo')
-      .serialize(new Container().createResolver(), 0)
+    const userData = await serialize(UserTransformer.transform(user).useVariant('basicInfo'))
     assert.deepEqual(userData, {
       id: 1,
       fullName: null,
     })
+
     expectTypeOf(userData).toEqualTypeOf<{
       id: number
       fullName: string | null
-    } | null>()
+    }>()
   })
 
   test('transform as collection using a specific variant', async ({ assert, expectTypeOf }) => {
@@ -945,7 +912,7 @@ test.group('Transformer', () => {
       toObject() {
         return {
           ...this.basicInfo(),
-          emails: EmailTransformer.collection(this.resource.emails),
+          emails: EmailTransformer.transform(this.resource.emails),
         }
       }
     }
@@ -954,9 +921,7 @@ test.group('Transformer', () => {
     user.id = 1
     user.fullName = null
 
-    const userData = await UserTransformer.collection([user])
-      .useVariant('basicInfo')
-      .serialize(new Container().createResolver(), 0)
+    const userData = await serialize(UserTransformer.transform([user]).useVariant('basicInfo'))
     assert.deepEqual(userData, [
       {
         id: 1,
@@ -1000,7 +965,10 @@ test.group('Transformer', () => {
 
     const container = new Container().createResolver()
     container.bindValue(Logger, new Logger())
-    const userData = await transform(user, UserTransformer, 'toObject', container)
+    const userData = await serialize(
+      UserTransformer.transform(user).useVariant('toObject'),
+      container
+    )
 
     assert.deepEqual(userData, {
       id: 1,
@@ -1039,7 +1007,7 @@ test.group('Transformer', () => {
       toObject() {
         return {
           ...this.omit(this.resource, ['emails']),
-          emails: EmailTransformer.collection(this.resource.emails),
+          emails: EmailTransformer.transform(this.resource.emails),
         }
       }
     }
@@ -1054,7 +1022,7 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await transform(user, UserTransformer)
+    const userData = await serialize(UserTransformer.transform(user))
     assert.deepEqual(userData, {
       id: 1,
       fullName: null,
@@ -1064,6 +1032,190 @@ test.group('Transformer', () => {
       id: number
       fullName: string | null
       emails: { id: number; email: string }[]
+    }>()
+  })
+
+  test('transform as paginator', async ({ assert, expectTypeOf }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = null
+    user.email = 'foo@bar.com'
+
+    const userData = await serialize(
+      UserTransformer.paginate([user], {
+        total: 1,
+        currentPage: 1,
+      })
+    )
+    assert.deepEqual(userData, {
+      data: [{ id: 1, fullName: null, email: 'foo@bar.com' }],
+      total: 1,
+      currentPage: 1,
+    })
+    expectTypeOf(userData).toEqualTypeOf<{
+      total: number
+      currentPage: number
+      data: {
+        id: number
+        fullName: string | null
+        email: string
+      }[]
+    }>()
+  })
+
+  test('set data prop', async ({ assert, expectTypeOf }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = null
+    user.email = 'foo@bar.com'
+
+    const userData = await serialize(
+      UserTransformer.paginate([user], {
+        total: 10,
+        currentPage: 1,
+      }).setDataProp('users')
+    )
+    assert.deepEqual(userData, {
+      users: [{ id: 1, fullName: null, email: 'foo@bar.com' }],
+      currentPage: 1,
+      total: 10,
+    })
+    expectTypeOf(userData).toEqualTypeOf<{
+      total: number
+      currentPage: number
+      users: {
+        id: number
+        fullName: string | null
+        email: string
+      }[]
+    }>()
+  })
+
+  test('set metadata', async ({ assert, expectTypeOf }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = null
+    user.email = 'foo@bar.com'
+
+    const userData = await serialize(
+      UserTransformer.paginate([user], {}).setMetaData({
+        total: 10,
+        currentPage: 1,
+        lastPage: 1,
+      })
+    )
+
+    assert.deepEqual(userData, {
+      data: [{ id: 1, fullName: null, email: 'foo@bar.com' }],
+      currentPage: 1,
+      lastPage: 1,
+      total: 10,
+    })
+    expectTypeOf(userData).toEqualTypeOf<{
+      total: number
+      currentPage: number
+      lastPage: number
+      data: {
+        id: number
+        fullName: string | null
+        email: string
+      }[]
+    }>()
+  })
+
+  test('compute metadata', async ({ assert, expectTypeOf }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = null
+    user.email = 'foo@bar.com'
+
+    const userData = await serialize(
+      UserTransformer.paginate([user], {
+        total: 10,
+        currentPage: 1,
+      }).setMetaData((metaData) => {
+        return {
+          ...metaData,
+          lastPage: 1,
+        }
+      })
+    )
+
+    assert.deepEqual(userData, {
+      data: [{ id: 1, fullName: null, email: 'foo@bar.com' }],
+      currentPage: 1,
+      lastPage: 1,
+      total: 10,
+    })
+    expectTypeOf(userData).toEqualTypeOf<{
+      total: number
+      currentPage: number
+      lastPage: number
+      data: {
+        id: number
+        fullName: string | null
+        email: string
+      }[]
     }>()
   })
 })

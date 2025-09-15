@@ -7,8 +7,8 @@
  * file that was distributed with this source code.
  */
 
-export { Item } from './src/item.js'
-export { Maybe } from './src/maybe.js'
-export { transform } from './src/transform.js'
-export { Collection } from './src/collection.js'
-export { BaseTransformer } from './src/base_transformer.js'
+export { Maybe } from './src/maybe.ts'
+export { Item } from './src/resource/item.ts'
+export { serialize } from './src/serialize.ts'
+export { Collection } from './src/resource/collection.ts'
+export { BaseTransformer } from './src/base_transformer.ts'

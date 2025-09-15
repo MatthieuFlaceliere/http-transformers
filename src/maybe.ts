@@ -35,5 +35,10 @@ export class Maybe<T> {
    * const maybeUndefined = new Maybe(undefined)
    * ```
    */
-  constructor(public value: T) {}
+  constructor(
+    /**
+     * The wrapped value, which may be undefined
+     */
+    public value: T
+  ) {}
 }

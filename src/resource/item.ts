@@ -7,22 +7,45 @@
  * file that was distributed with this source code.
  */
 
-import type { RuntimeException } from '@poppinss/exception'
 import type { ContainerResolver } from '@adonisjs/fold'
+import type { RuntimeException } from '@poppinss/exception'
 
-import { serialize } from './helpers.js'
-import type { ExtractResourceVariants, InferData, Next } from './types.js'
+import { transformAndSerialize } from '../utils.ts'
+import type { ExtractTransformerVariants, InferData, Next } from '../types.ts'
 
 /**
- * Represents a transformer created for a source item.
+ * Represents a transformer created for a single source item.
+ * Provides functionality to transform individual data items into a consistent format.
+ *
+ * @template Transformer - The transformer class used to transform the item
+ * @template MaxDepth - Maximum depth for nested transformations
+ * @template Variant - The transformer method variant to use for serialization
+ *
+ * @example
+ * ```ts
+ * class UserTransformer extends BaseTransformer<User> {
+ *   toObject() {
+ *     return { id: this.resource.id, name: this.resource.name }
+ *   }
+ * }
+ *
+ * const item = UserTransformer.item(userData)
+ * const serialized = await item.serialize(container, 0, 2)
+ * ```
  */
 export class Item<
   Transformer extends Record<string, any>,
-  Depth extends number,
+  MaxDepth extends Next[number],
   Variant extends string,
-  Fallback extends any = {},
 > {
+  /**
+   * Private debugging error instance for troubleshooting
+   */
   #debuggingError: RuntimeException
+
+  /**
+   * Type identifier for the item resource
+   */
   $type: 'item' = 'item'
 
   /**
@@ -50,10 +73,9 @@ export class Item<
   constructor(
     protected transformerData: any,
     protected transformer: { new (...args: any[]): Transformer },
-    protected maxDepth: Depth,
+    protected maxDepth: MaxDepth,
     protected variant: Variant,
-    debuggingError: RuntimeException,
-    protected allowNullable: boolean = true
+    debuggingError: RuntimeException
   ) {
     this.#debuggingError = debuggingError
   }
@@ -70,14 +92,13 @@ export class Item<
    *   .depth(3) // Allow 3 levels of nested relationships
    * ```
    */
-  depth<T extends Next[number]>(value: T): Item<Transformer, T, Variant, Fallback> {
+  depth<T extends Next[number]>(value: T): Item<Transformer, T, Variant> {
     return new Item(
       this.transformerData,
       this.transformer,
       value,
       this.variant,
-      this.#debuggingError,
-      this.allowNullable
+      this.#debuggingError
     )
   }
 
@@ -92,37 +113,15 @@ export class Item<
    *   .useVariant('toSummary') // Use toSummary() instead of toObject()
    * ```
    */
-  useVariant<V extends ExtractResourceVariants<Transformer>>(
+  useVariant<V extends ExtractTransformerVariants<Transformer>>(
     value: V
-  ): Item<Transformer, Depth, V, Fallback> {
+  ): Item<Transformer, MaxDepth, V> {
     return new Item(
       this.transformerData,
       this.transformer,
       this.maxDepth,
       value,
-      this.#debuggingError,
-      this.allowNullable
-    )
-  }
-
-  /**
-   * Instruct item to disallow nullable values. An error will be
-   * thrown if the value is null.
-   *
-   * @example
-   * ```ts
-   * const user = UserTransformer.item(userData)
-   *   .notNullable() // Throw error if userData is null
-   * ```
-   */
-  notNullable(): Item<Transformer, Depth, Variant, unknown> {
-    return new Item(
-      this.transformerData,
-      this.transformer,
-      this.maxDepth,
-      this.variant,
-      this.#debuggingError,
-      false
+      this.#debuggingError
     )
   }
 
@@ -143,38 +142,22 @@ export class Item<
     container: ContainerResolver<any>,
     depth: number,
     maxDepth?: number
-  ): Promise<InferData<Transformer, Variant>> | Fallback {
+  ): Promise<InferData<Transformer, Variant>> {
     /**
      * If its undefined after unpacking, then throw an error
      */
     if (this.transformerData === undefined) {
       this.#debuggingError.message =
-        'Cannot transform an item with undefined value. Use "this.whenLoaded(value)" to allow undefined values'
+        'Cannot transform undefined value. Use "this.whenLoaded(value)" to allow undefined values'
       throw this.#debuggingError
     }
 
-    /**
-     * Allow null value when "allowNullable" flag is on.
-     */
-    if (this.allowNullable && this.transformerData === null) {
-      return null as Fallback
-    }
-
-    /**
-     * Allow null value when "allowNullable" flag is on.
-     */
-    if (this.transformerData === null) {
-      this.#debuggingError.message =
-        'Cannot transform an item with null value. Remove "notNullable" modifier to allow null values'
-      throw this.#debuggingError
-    }
-
-    return serialize(
+    return transformAndSerialize(
       container,
       new this.transformer(this.transformerData),
       this.variant,
       depth,
-      maxDepth ?? this.maxDepth
+      maxDepth === -1 ? undefined : (maxDepth ?? this.maxDepth)
     ) as Promise<InferData<Transformer, Variant>>
   }
 }

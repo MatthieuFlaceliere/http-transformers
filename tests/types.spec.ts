@@ -8,18 +8,18 @@
  */
 
 import { test } from '@japa/runner'
-import { debug } from '../src/debug.js'
-import { type InferData } from '../src/types.js'
-import { transform } from '../src/transform.js'
-import { User } from './fixtures/models/user.js'
-import { Post } from './fixtures/models/posts.js'
-import { Email } from './fixtures/models/email.js'
-import { Profile } from './fixtures/models/profile.js'
-import { PostTransformer } from './fixtures/transformers/post.js'
-import { UserTransformer } from './fixtures/transformers/user.js'
-import { EmailTransformer } from './fixtures/transformers/email.js'
-import { ProfileTransformer } from './fixtures/transformers/profile.js'
-import { BaseTransformer } from '../src/base_transformer.js'
+import { debug } from '../src/debug.ts'
+import { serialize } from '../src/serialize.ts'
+import { type InferData } from '../src/types.ts'
+import { User } from './fixtures/models/user.ts'
+import { Post } from './fixtures/models/posts.ts'
+import { Email } from './fixtures/models/email.ts'
+import { Profile } from './fixtures/models/profile.ts'
+import { BaseTransformer } from '../src/base_transformer.ts'
+import { PostTransformer } from './fixtures/transformers/post.ts'
+import { UserTransformer } from './fixtures/transformers/user.ts'
+import { EmailTransformer } from './fixtures/transformers/email.ts'
+import { ProfileTransformer } from './fixtures/transformers/profile.ts'
 
 test.group('Types', () => {
   test('infer nested objects and arrays', async ({ expectTypeOf }) => {
@@ -45,7 +45,7 @@ test.group('Types', () => {
     }
 
     const exampleTransformer = new ExampleTransformer({})
-    const exampleDataObject = await transform({}, ExampleTransformer)
+    const exampleDataObject = await serialize(ExampleTransformer.transform({}))
     type ExampleData = InferData<typeof exampleTransformer>
     debug('%O', exampleDataObject)
 
@@ -68,7 +68,7 @@ test.group('Types | Fixtures', () => {
   test('infer graph of post transformer', async ({ expectTypeOf }) => {
     const post = new Post()
     const postTransformer = new PostTransformer(post)
-    const postDataObject = await transform(post, PostTransformer)
+    const postDataObject = await serialize(PostTransformer.transform(post))
 
     type PostData = InferData<typeof postTransformer>
     debug('%O', postDataObject)
@@ -105,7 +105,6 @@ test.group('Types | Fixtures', () => {
             }[]
           }
         | { isGuest: boolean }
-        | null
     }>()
 
     expectTypeOf(postDataObject).toEqualTypeOf<PostData>()
@@ -123,7 +122,7 @@ test.group('Types | Fixtures', () => {
     user.posts = [new Post()]
 
     const userTransformer = new UserTransformer(user)
-    const userDataObject = await transform(user, UserTransformer)
+    const userDataObject = await serialize(UserTransformer.transform(user))
     type UserData = InferData<typeof userTransformer>
 
     debug('%o', userDataObject)
@@ -142,7 +141,6 @@ test.group('Types | Fixtures', () => {
                   name: string
                 }
               | undefined
-              | null
             emails: {
               id: number
               email: string
@@ -165,7 +163,6 @@ test.group('Types | Fixtures', () => {
               name: string
             }
           | { isGuest: boolean }
-          | null
       }[]
     }>()
     expectTypeOf(userDataObject).toEqualTypeOf<UserData>()
@@ -182,7 +179,7 @@ test.group('Types | Fixtures', () => {
     profile.user.posts = [new Post()]
 
     const profileTransformer = new ProfileTransformer(profile)
-    const profileDataObject = await transform(profile, ProfileTransformer)
+    const profileDataObject = await serialize(ProfileTransformer.transform(profile))
     type ProfileData = InferData<typeof profileTransformer>
 
     debug('%O', profileDataObject)
@@ -196,7 +193,6 @@ test.group('Types | Fixtures', () => {
             id: number
             name: string
           }
-        | null
         | undefined
       emails: {
         id: number
@@ -207,7 +203,7 @@ test.group('Types | Fixtures', () => {
     expectTypeOf(profileDataObject).toEqualTypeOf<ProfileData>()
   })
 
-  test('infer graph of profile email transformer', async ({ expectTypeOf }) => {
+  test('infer graph of email transformer', async ({ expectTypeOf }) => {
     const profile = new Profile()
     const email = new Email()
     const user = new User()
@@ -215,7 +211,7 @@ test.group('Types | Fixtures', () => {
     email.profile = profile
 
     const emailTransformer = new EmailTransformer(email)
-    const emailDataObject = await transform(email, EmailTransformer)
+    const emailDataObject = await serialize(EmailTransformer.transform(email))
     type EmailData = InferData<typeof emailTransformer>
 
     debug('%o', emailDataObject)
@@ -227,12 +223,12 @@ test.group('Types | Fixtures', () => {
       user: {
         id: number
         name: string
-      } | null
+      }
       profile: {
         id: number
         twitterHandle: string | null
         githubUsername: string | null
-      } | null
+      }
     }>()
     expectTypeOf(emailDataObject).toEqualTypeOf<EmailData>()
   })

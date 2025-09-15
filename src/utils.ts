@@ -10,10 +10,11 @@
 import { RuntimeException } from '@poppinss/exception'
 import type { ContainerResolver } from '@adonisjs/fold'
 
-import { Item } from './item.js'
-import { debug } from './debug.js'
-import { Collection } from './collection.js'
-import type { JSONDataTypes, ResourceData } from './types.js'
+import { debug } from './debug.ts'
+import { Item } from './resource/item.ts'
+import { Collection } from './resource/collection.ts'
+import type { JSONDataTypes, ResourceData } from './types.ts'
+import { Paginator } from './paginator.ts'
 
 /**
  * Checks if value is an object excluding Arrays and null values
@@ -33,21 +34,28 @@ export function isObject<T extends Record<string, any>>(value: unknown): value i
 }
 
 /**
- * Serializes a transformer instance using the specified variant method
+ * Transforms data using a transformer instance and then serializes the result.
+ * Calls the specified variant method on the transformer and validates the output.
  *
  * @param container - Container resolver for dependency injection
- * @param transformer - The transformer instance to serialize
- * @param variant - Name of the variant method to call
+ * @param transformer - The transformer instance to use
+ * @param variant - The transformer method name to call
  * @param depth - Current depth level in the transformation tree
  * @param maxDepth - Optional maximum depth limit
  *
  * @example
  * ```ts
- * const user = new UserTransformer(userData)
- * const result = await serialize(container, user, 'toObject', 0, 3)
+ * const userTransformer = new UserTransformer(userData)
+ * const result = await transformAndSerialize(
+ *   container,
+ *   userTransformer,
+ *   'toObject',
+ *   0,
+ *   3
+ * )
  * ```
  */
-export async function serialize(
+export async function transformAndSerialize(
   container: ContainerResolver<any>,
   transformer: Record<string, any>,
   variant: string,
@@ -66,23 +74,6 @@ export async function serialize(
   }
   return serializeValues(container, input, depth, maxDepth)
 }
-
-/**
- * Serializes JSON data-types recursively by creating a new copy
- * of objects and arrays.
- * Will use if we decide to create a fresh copy of returned values. For
- * now we keep the references
- */
-// export function serializeJSON(input: JSONDataTypes): JSONDataTypes {
-//   let output = input
-//   if (typeof input === 'object' && input !== null) {
-//     output = Array.isArray(input) ? [] : {}
-//     for (const [key, value] of Object.entries(input)) {
-//       ;(output as any)[key] = serializeJSON(value)
-//     }
-//   }
-//   return output
-// }
 
 /**
  * Recursively serializes values from a resource data object, handling nested
@@ -111,19 +102,18 @@ export async function serializeValues(
 ) {
   let output: JSONDataTypes = {}
   for (const [key, value] of Object.entries(input)) {
-    if (value instanceof Item || value instanceof Collection) {
+    if (value instanceof Item || value instanceof Collection || value instanceof Paginator) {
       debug('resolving key "%s" with maxDepth="%s" and depth="%s"', key, maxDepth, depth)
-      if (maxDepth && depth >= maxDepth) {
+      if (maxDepth && maxDepth !== -1 && depth >= maxDepth) {
         continue
       } else {
-        output[key] = await value.serialize(container, depth + 1, maxDepth)
+        output[key] = await value.serialize(
+          container,
+          maxDepth === -1 ? depth : depth + 1,
+          maxDepth
+        )
       }
     } else {
-      /**
-       * Call serializeJSON if we want to create a new copy for every
-       * value. Maybe we should avoid that for performance?
-       */
-      //serializeJSON(value)
       output[key] = value
     }
   }

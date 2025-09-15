@@ -1,6 +1,6 @@
-import { type Post } from '../models/posts.js'
-import { UserTransformer } from './user.js'
-import { BaseTransformer } from '../../../src/base_transformer.js'
+import { type Post } from '../models/posts.ts'
+import { UserTransformer } from './user.ts'
+import { BaseTransformer } from '../../../src/base_transformer.ts'
 
 export class PostTransformer extends BaseTransformer<Post> {
   async toObject() {
@@ -20,7 +20,7 @@ export class PostTransformer extends BaseTransformer<Post> {
       },
       author:
         this.resource.author !== undefined
-          ? UserTransformer.item(this.resource.author).depth(2)
+          ? UserTransformer.transform(this.resource.author).depth(2)
           : { isGuest: true },
     }
   }

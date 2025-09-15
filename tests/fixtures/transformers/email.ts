@@ -1,7 +1,7 @@
-import { type Email } from '../models/email.js'
-import { UserTransformer } from './user.js'
-import { ProfileTransformer } from './profile.js'
-import { BaseTransformer } from '../../../src/base_transformer.js'
+import { type Email } from '../models/email.ts'
+import { UserTransformer } from './user.ts'
+import { ProfileTransformer } from './profile.ts'
+import { BaseTransformer } from '../../../src/base_transformer.ts'
 
 export class EmailTransformer extends BaseTransformer<Email> {
   async toObject() {
@@ -9,8 +9,8 @@ export class EmailTransformer extends BaseTransformer<Email> {
       id: 1,
       email: 'foo@bar.com',
       is_verified: false,
-      user: UserTransformer.item(this.resource.user),
-      profile: ProfileTransformer.item(this.resource.profile),
+      user: UserTransformer.transform(this.resource.user),
+      profile: ProfileTransformer.transform(this.resource.profile),
     }
   }
 }

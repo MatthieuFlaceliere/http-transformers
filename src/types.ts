@@ -10,8 +10,9 @@
 import { type Prettify } from '@poppinss/types'
 import { type ContainerResolver } from '@adonisjs/fold'
 
-import type { Item } from './item.js'
-import type { Collection } from './collection.js'
+import type { Item } from './resource/item.ts'
+import { type Paginator } from './paginator.ts'
+import type { Collection } from './resource/collection.ts'
 
 /**
  * Counter to increment the depth. At max we will allow fetching
@@ -43,7 +44,7 @@ export type Next = [1, 2, 3, 4, 5, 6]
  * ]
  * ```
  */
-type JSONValues =
+export type JSONValues =
   | string
   | number
   | bigint
@@ -96,7 +97,7 @@ export type JSONDataTypes = JSONValues | JSONDataTypes[] | { [key: string]: JSON
  * Extracts the variant methods of a resource. Any method that returns ResourceData
  * can be picked for serialization
  *
- * @template Resource - The resource class to extract variants from
+ * @template Transformer - The resource class to extract variants from
  *
  * @example
  * ```typescript
@@ -109,11 +110,13 @@ export type JSONDataTypes = JSONValues | JSONDataTypes[] | { [key: string]: JSON
  * type Variants = ExtractResourceVariants<UserResource> // "toObject" | "toSummary"
  * ```
  */
-export type ExtractResourceVariants<Resource> = {
-  [K in keyof Resource & string]: Resource[K] extends () => ResourceData | Promise<ResourceData>
+export type ExtractTransformerVariants<Transformer> = {
+  [K in keyof Transformer & string]: Transformer[K] extends (
+    ...args: any[]
+  ) => ResourceData | Promise<ResourceData>
     ? K
     : never
-}[keyof Resource & string]
+}[keyof Transformer & string]
 
 /**
  * Supported resource datatypes. The collections and items are supported only
@@ -131,7 +134,11 @@ export type ExtractResourceVariants<Resource> = {
  * const itemData: ResourceDataTypes = new Item(user, UserResource)
  * ```
  */
-export type ResourceDataTypes = JSONDataTypes | Collection<any, any, any> | Item<any, any, any, any>
+export type ResourceDataTypes =
+  | JSONDataTypes
+  | Collection<any, any, any>
+  | Item<any, any, any>
+  | Paginator<any, any, any>
 
 /**
  * A record of resource data types. This is something every transformer
@@ -160,21 +167,22 @@ export type ResourceData = Record<string, ResourceDataTypes>
  * @template MaxDepth - Maximum depth allowed for unpacking
  * @template Depth - Current depth level
  */
-type UnpackKeyValue<Value, MaxDepth extends number, Depth extends number> = [
-  Item<any, any, any, any>,
-] extends [Value]
-  ?
-      | UnpackAsItem<Extract<Value, Item<any, any, any, any>>, MaxDepth, Depth>
-      | Exclude<Value, Item<any, any, any, any>>
+export type UnpackKeyValue<
+  Value,
+  MaxDepth extends number,
+  Depth extends number,
+  AtTopLevel extends boolean,
+> = [Item<any, any, any>] extends [Value]
+  ? UnpackAsItem<Value, MaxDepth, Depth, AtTopLevel>
   : [Collection<any, any, any>] extends [Value]
-    ?
-        | UnpackAsCollection<Extract<Value, Collection<any, any, any>>, MaxDepth, Depth>
-        | Exclude<Value, Collection<any, any, any>>
-    : Value extends CanBeSerialized<infer B>
-      ? B
-      : Value extends JSONDataTypes
-        ? Value
-        : string
+    ? UnpackAsCollection<Value, MaxDepth, Depth, AtTopLevel>
+    : [Paginator<any, any, any>] extends [Value]
+      ? UnpackAsPaginator<Value, MaxDepth, Depth, AtTopLevel>
+      : Value extends CanBeSerialized<infer B>
+        ? B
+        : Value extends JSONDataTypes
+          ? Value
+          : string
 
 /**
  * Validates the Depth property against the MaxDepth and drops the key
@@ -188,9 +196,18 @@ type UnpackKeyValue<Value, MaxDepth extends number, Depth extends number> = [
  * @template Value - The value associated with the key
  * @template MaxDepth - Maximum allowed depth
  * @template Depth - Current depth level
+ *
+ * @example
+ * ```typescript
+ * type LimitedKey = LimitDepth<"posts", Collection<Post, 2, "toObject">, 2, 2>
+ * // Result: never (key is dropped because depth limit is reached)
+ *
+ * type AllowedKey = LimitDepth<"posts", Collection<Post, 2, "toObject">, 3, 2>
+ * // Result: "posts" (key is allowed because depth limit is not reached)
+ * ```
  */
-type LimitDepth<Key, Value, MaxDepth extends number, Depth extends number> = [
-  Item<any, any, any, any>,
+export type LimitDepth<Key, Value, MaxDepth extends number, Depth extends number> = [
+  Item<any, any, any>,
 ] extends [Value]
   ? MaxDepth extends Depth
     ? never
@@ -199,7 +216,11 @@ type LimitDepth<Key, Value, MaxDepth extends number, Depth extends number> = [
     ? MaxDepth extends Depth
       ? never
       : Key
-    : Key
+    : [Paginator<any, any, any>] extends [Value]
+      ? MaxDepth extends Depth
+        ? never
+        : Key
+      : Key
 
 /**
  * Only unpacks values that can be undefined and mark them as optional.
@@ -218,12 +239,17 @@ type LimitDepth<Key, Value, MaxDepth extends number, Depth extends number> = [
  * // Result: { email?: string; age?: number }
  * ```
  */
-export type UnpackOptionalValues<Data, MaxDepth extends number, Depth extends number> = {
+export type UnpackOptionalValues<
+  Data,
+  MaxDepth extends number,
+  Depth extends number,
+  AtTopLevel extends boolean,
+> = {
   [O in {
     [K in keyof Data]: [undefined] extends [Data[K]]
       ? LimitDepth<K, Data[K], MaxDepth, Depth>
       : never
-  }[keyof Data]]?: UnpackKeyValue<Data[O], MaxDepth, Depth>
+  }[keyof Data]]?: UnpackKeyValue<Data[O], MaxDepth, Depth, AtTopLevel>
 }
 
 /**
@@ -243,12 +269,17 @@ export type UnpackOptionalValues<Data, MaxDepth extends number, Depth extends nu
  * // Result: { name: string; age: number | null }
  * ```
  */
-export type UnpackRequiredValues<Data, MaxDepth extends number, Depth extends number> = {
+export type UnpackRequiredValues<
+  Data,
+  MaxDepth extends number,
+  Depth extends number,
+  AtTopLevel extends boolean,
+> = {
   [O in {
     [K in keyof Data]: [undefined] extends [Data[K]]
       ? never
       : LimitDepth<K, Data[K], MaxDepth, Depth>
-  }[keyof Data]]: UnpackKeyValue<Data[O], MaxDepth, Depth>
+  }[keyof Data]]: UnpackKeyValue<Data[O], MaxDepth, Depth, AtTopLevel>
 }
 
 /**
@@ -265,19 +296,18 @@ export type UnpackRequiredValues<Data, MaxDepth extends number, Depth extends nu
  * // Result: inferred data structure from User.toObject()
  * ```
  */
-export type UnpackAsItem<T, MaxDepth extends number, Depth extends number> =
-  T extends Item<infer Resource, infer LocalMaxDepth, infer Variant, infer Fallback>
-    ? unknown extends Fallback
-      ? InferData<Resource, Variant, MaxDepth extends -1 ? LocalMaxDepth : MaxDepth, Next[Depth]>
-      :
-          | InferData<
-              Resource,
-              Variant,
-              MaxDepth extends -1 ? LocalMaxDepth : MaxDepth,
-              Next[Depth]
-            >
-          | Fallback
-    : never
+export type UnpackAsItem<
+  T,
+  MaxDepth extends number,
+  Depth extends number,
+  AtTopLevel extends boolean,
+> = AtTopLevel extends true
+  ? T extends Item<infer Transformer, any, infer Variant>
+    ? InferData<Transformer, Variant, -1, 0>
+    : T
+  : T extends Item<infer Transformer, infer LocalMaxDepth, infer Variant>
+    ? InferData<Transformer, Variant, MaxDepth extends -1 ? LocalMaxDepth : MaxDepth, Next[Depth]>
+    : T
 
 /**
  * Unpacks an unknown value when it is an instance of "Collection" class and
@@ -293,10 +323,52 @@ export type UnpackAsItem<T, MaxDepth extends number, Depth extends number> =
  * // Result: Array of inferred data structures from User.toObject()
  * ```
  */
-export type UnpackAsCollection<T, MaxDepth extends number, Depth extends number> =
-  T extends Collection<infer Resource, infer LocalMaxDepth, infer Variant>
-    ? InferData<Resource, Variant, MaxDepth extends -1 ? LocalMaxDepth : MaxDepth, Next[Depth]>[]
-    : never
+export type UnpackAsCollection<
+  T,
+  MaxDepth extends number,
+  Depth extends number,
+  AtTopLevel extends boolean,
+> = AtTopLevel extends true
+  ? T extends Collection<infer Transformer, any, infer Variant>
+    ? InferData<Transformer, Variant, -1, 0>[]
+    : T
+  : T extends Collection<infer Transformer, infer LocalMaxDepth, infer Variant>
+    ? InferData<
+        Transformer,
+        Variant,
+        MaxDepth extends -1 ? LocalMaxDepth : MaxDepth,
+        Depth extends -1 ? 0 : Next[Depth]
+      >[]
+    : T
+
+/**
+ * Unpacks a Paginator type with depth tracking for nested relationships.
+ * Combines the unpacked collection data with pagination metadata.
+ *
+ * @template T - The Paginator type to unpack
+ * @template MaxDepth - Maximum depth allowed for unpacking
+ * @template Depth - Current depth level
+ *
+ * @example
+ * ```typescript
+ * type UserPaginator = Paginator<Collection<UserTransformer, 2, "toObject">, "data", { page: number }>
+ * type UnpackedPaginator = UnpackAsPaginator<UserPaginator, 3, 0>
+ * // Result: { data: UserData[]; page: number }
+ * ```
+ */
+export type UnpackAsPaginator<
+  T,
+  MaxDepth extends number,
+  Depth extends number,
+  AtTopLevel extends boolean,
+> =
+  T extends Paginator<infer PaginatorCollection, infer DataProp, infer MetaData>
+    ? Prettify<
+        {
+          [M in DataProp]: UnpackAsCollection<PaginatorCollection, MaxDepth, Depth, AtTopLevel>
+        } & MetaData
+      >
+    : T
 
 /**
  * Unpack values as two sets of optional and required values, then merge them
@@ -316,15 +388,21 @@ export type UnpackAsCollection<T, MaxDepth extends number, Depth extends number>
  * // Result: { name: string; email?: string; posts: PostData[] }
  * ```
  */
-export type UnpackValues<Data, MaxDepth extends number, Depth extends number> = Prettify<
-  UnpackRequiredValues<Data, MaxDepth, Depth> & UnpackOptionalValues<Data, MaxDepth, Depth>
+export type UnpackValues<
+  Data,
+  MaxDepth extends number,
+  Depth extends number,
+  AtTopLevel extends boolean,
+> = Prettify<
+  UnpackRequiredValues<Data, MaxDepth, Depth, AtTopLevel> &
+    UnpackOptionalValues<Data, MaxDepth, Depth, AtTopLevel>
 >
 
 /**
  * Infers the serialized data structure of a resource by extracting the return type
  * of a specific variant method and unpacking it recursively.
  *
- * @template Resource - The resource class to infer data from
+ * @template Transformer - The resource class to infer data from
  * @template Variant - The variant method name to use (defaults to 'toObject')
  * @template MaxDepth - Maximum depth allowed for unpacking (defaults to -1 for unlimited)
  * @template Depth - Current depth level (defaults to 0)
@@ -345,65 +423,83 @@ export type UnpackValues<Data, MaxDepth extends number, Depth extends number> = 
  * ```
  */
 export type InferData<
-  Resource,
+  Transformer,
   Variant extends string = 'toObject',
   MaxDepth extends number = -1,
   Depth extends number = 0,
-> = Resource extends { [K in Variant]: (...args: any[]) => unknown }
-  ? UnpackValues<Awaited<ReturnType<Resource[Variant]>>, MaxDepth, Depth>
+> = Transformer extends { [K in Variant]: (...args: any[]) => unknown }
+  ? UnpackValues<Awaited<ReturnType<Transformer[Variant]>>, MaxDepth, Depth, false>
   : never
 
 /**
- * Transform function type that handles both single items and arrays of data.
- * Provides overloaded signatures for transforming data using resource transformers.
+ * Function interface for the main serialize function that handles different data types.
+ * Provides overloads for serializing Items, Collections, Paginators, and resource data.
  *
  * @example
  * ```typescript
- * const transform: TransformFn = async (data, transformer, variant, container) => {
- *   // Implementation handles both single items and arrays
- *   // Returns properly typed results based on input
+ * const serialize: SerializeFn = (data, container) => {
+ *   // Implementation handles different data types
+ *   return Promise.resolve(serializedData)
  * }
  *
  * // Usage examples:
- * const singleUser = await transform(userData, UserResource, "toObject")
- * const userList = await transform([userData1, userData2], UserResource, "toSummary")
+ * const userItem = UserTransformer.item(userData)
+ * const serializedUser = await serialize(userItem)
+ *
+ * const usersCollection = UserTransformer.collection(usersData)
+ * const serializedUsers = await serialize(usersCollection)
  * ```
  */
-export type TransformFn = {
+export type SerializeFn = {
   /**
-   * Transforms a single data item using the specified transformer and variant
+   * Serializes a record of resource data types into plain JavaScript objects.
    *
-   * @param data - The data item to transform
-   * @param transformer - The transformer class constructor
-   * @param variant - The variant method to use for transformation
+   * @template Data - Record type containing resource data
+   * @param data - The resource data record to serialize
    * @param container - Optional container resolver for dependency injection
+   * @returns Promise resolving to unpacked and serialized data
    */
-  <
-    Data extends ConstructorParameters<Transformer>[0],
-    Transformer extends { new (...args: any[]): any },
-    Variant extends string = 'toObject',
-  >(
+  <Data extends Record<string, ResourceDataTypes>>(
     data: Data,
-    transformer: Transformer,
-    variant?: Variant | ExtractResourceVariants<InstanceType<Transformer>>,
     container?: ContainerResolver<any>
-  ): Promise<InferData<InstanceType<Transformer>, Variant>>
+  ): Promise<UnpackValues<Data, -1, 0, true>>
+
   /**
-   * Transforms an array of data items using the specified transformer and variant
+   * Serializes an Item resource into its plain JavaScript representation.
    *
-   * @param data - The array of data items to transform
-   * @param transformer - The transformer class constructor
-   * @param variant - The variant method to use for transformation
+   * @template ResourceItem - Item type to serialize
+   * @param resource - The Item resource to serialize
    * @param container - Optional container resolver for dependency injection
+   * @returns Promise resolving to the serialized Item data
    */
-  <
-    Data extends ConstructorParameters<Transformer>[0],
-    Transformer extends { new (...args: any[]): any },
-    Variant extends string = 'toObject',
-  >(
-    data: Data[],
-    transformer: Transformer,
-    variant?: Variant | ExtractResourceVariants<InstanceType<Transformer>>,
+  <ResourceItem extends Item<any, any, any>>(
+    resource: ResourceItem,
     container?: ContainerResolver<any>
-  ): Promise<InferData<InstanceType<Transformer>, Variant>[]>
+  ): Promise<UnpackAsItem<ResourceItem, -1, 0, true>>
+
+  /**
+   * Serializes a Collection resource into an array of plain JavaScript objects.
+   *
+   * @template ResourceCollection - Collection type to serialize
+   * @param collection - The Collection resource to serialize
+   * @param container - Optional container resolver for dependency injection
+   * @returns Promise resolving to an array of serialized data
+   */
+  <ResourceCollection extends Collection<any, any, any>>(
+    collection: ResourceCollection,
+    container?: ContainerResolver<any>
+  ): Promise<UnpackAsCollection<ResourceCollection, -1, 0, true>>
+
+  /**
+   * Serializes a Paginator resource into paginated data with metadata.
+   *
+   * @template ResourcePaginator - Paginator type to serialize
+   * @param paginator - The Paginator resource to serialize
+   * @param container - Optional container resolver for dependency injection
+   * @returns Promise resolving to paginated data with metadata
+   */
+  <ResourcePaginator extends Paginator<any, any, any>>(
+    paginator: ResourcePaginator,
+    container?: ContainerResolver<any>
+  ): Promise<UnpackAsPaginator<ResourcePaginator, -1, 0, true>>
 }

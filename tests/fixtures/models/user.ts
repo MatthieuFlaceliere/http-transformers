@@ -1,5 +1,5 @@
-import type { Post } from './posts.js'
-import type { Profile } from './profile.js'
+import type { Post } from './posts.ts'
+import type { Profile } from './profile.ts'
 
 export class User {
   declare id: number

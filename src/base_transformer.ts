@@ -9,9 +9,10 @@
 
 import { RuntimeException } from '@poppinss/exception'
 
-import { Item } from './item.js'
-import { Maybe } from './maybe.js'
-import { Collection } from './collection.js'
+import { Maybe } from './maybe.ts'
+import { Item } from './resource/item.ts'
+import { Collection } from './resource/collection.ts'
+import { Paginator } from './paginator.ts'
 
 /**
  * Serves as the base for creating custom data transformers.
@@ -37,86 +38,102 @@ import { Collection } from './collection.js'
  */
 export abstract class BaseTransformer<T> {
   /**
-   * Specify a one-to-one relationship with a given transformer.
+   * Static method to transform data into Item or Collection instances.
+   * Handles single objects, arrays, null values, and Maybe-wrapped values.
    *
-   * @param data - The data to transform, can be wrapped in Maybe for optional values
+   * @param data - The data to transform (can be single object, array, null, or Maybe-wrapped)
    *
    * @example
    * ```ts
    * class UserTransformer extends BaseTransformer<User> {
    *   toObject() {
-   *     return {
-   *       id: this.resource.id,
-   *       profile: UserTransformer.item(this.resource.profile)
-   *     }
+   *     return { id: this.resource.id, name: this.resource.name }
    *   }
    * }
+   *
+   * // Transform single user
+   * const userItem = UserTransformer.transform(user)
+   *
+   * // Transform array of users
+   * const userCollection = UserTransformer.transform([user1, user2])
+   *
+   * // Transform with Maybe wrapper
+   * const maybeUser = UserTransformer.transform(new Maybe(user))
    * ```
    */
-  static item<Self extends { new (...args: any[]): any }>(
+  /**
+   * Transform data wrapped in Maybe that can be undefined
+   *
+   * @param data - Maybe-wrapped data that can be undefined
+   */
+  static transform<Self extends { new (...args: any[]): any }>(
     this: Self,
-    data: Maybe<ConstructorParameters<Self>[0] | null>
-  ): Item<InstanceType<Self>, 1, 'toObject', null> | undefined
-
-  static item<Self extends { new (...args: any[]): any }>(
-    this: Self,
-    data: ConstructorParameters<Self>[0] | null
-  ): Item<InstanceType<Self>, 1, 'toObject', null>
-
-  static item<Self extends { new (...args: any[]): any }>(
-    this: Self,
-    data: ConstructorParameters<Self>[0] | null | Maybe<ConstructorParameters<Self>[0] | null>
-  ) {
-    /**
-     * If optional values are allowed and the value is undefined, then
-     * we return undefined
-     */
-    const canBeOptional = data instanceof Maybe
-    const unwrappedValue = canBeOptional ? data.value : data
-    if (canBeOptional && unwrappedValue === undefined) {
-      return undefined
-    }
-
-    return new Item<InstanceType<Self>, 1, 'toObject', null>(
-      unwrappedValue,
-      this,
-      1,
-      'toObject',
-      new RuntimeException(),
-      true
-    )
-  }
+    data: Maybe<ConstructorParameters<Self>[0]>
+  ): Item<InstanceType<Self>, 1, 'toObject'> | undefined
 
   /**
-   * Specify a many relationship with a given transformer.
+   * Transform a single data object
    *
-   * @param data - Array of data to transform, can be wrapped in Maybe for optional values
-   *
-   * @example
-   * ```ts
-   * class UserTransformer extends BaseTransformer<User> {
-   *   toObject() {
-   *     return {
-   *       id: this.resource.id,
-   *       posts: PostTransformer.collection(this.resource.posts)
-   *     }
-   *   }
-   * }
-   * ```
+   * @param data - Single data object to transform
    */
-  static collection<Self extends { new (...args: any[]): any }>(
+  static transform<Self extends { new (...args: any[]): any }>(
+    this: Self,
+    data: ConstructorParameters<Self>[0]
+  ): Item<InstanceType<Self>, 1, 'toObject'>
+
+  /**
+   * Transform data wrapped in Maybe that can be undefined or null
+   *
+   * @param data - Maybe-wrapped data that can be undefined or null
+   */
+  static transform<Self extends { new (...args: any[]): any }>(
+    this: Self,
+    data: Maybe<ConstructorParameters<Self>[0] | null>
+  ): Item<InstanceType<Self>, 1, 'toObject'> | undefined | null
+
+  /**
+   * Transform a single data object that can be null
+   *
+   * @param data - Single data object that can be null
+   */
+  static transform<Self extends { new (...args: any[]): any }>(
+    this: Self,
+    data: ConstructorParameters<Self>[0] | null
+  ): Item<InstanceType<Self>, 1, 'toObject'> | null
+
+  /**
+   * Transform an array wrapped in Maybe that can be undefined
+   *
+   * @param data - Maybe-wrapped array that can be undefined
+   */
+  static transform<Self extends { new (...args: any[]): any }>(
     this: Self,
     data: Maybe<ConstructorParameters<Self>[0][]>
   ): Collection<InstanceType<Self>, 1, 'toObject'> | undefined
 
-  static collection<Self extends { new (...args: any[]): any }>(
+  /**
+   * Transform an array of data objects
+   *
+   * @param data - Array of data objects to transform
+   */
+  static transform<Self extends { new (...args: any[]): any }>(
     this: Self,
     data: ConstructorParameters<Self>[0][]
   ): Collection<InstanceType<Self>, 1, 'toObject'>
 
-  static collection<Self extends { new (...args: any[]): any }>(
+  /**
+   * Implementation method that handles all transform overloads
+   *
+   * @param data - Union of all possible data types that can be transformed
+   */
+  static transform<Self extends { new (...args: any[]): any }>(
     this: Self,
-    data: ConstructorParameters<Self>[0][] | Maybe<ConstructorParameters<Self>[0][]>
+    data:
+      | ConstructorParameters<Self>[0]
+      | null
+      | Maybe<ConstructorParameters<Self>[0] | null>
+      | ConstructorParameters<Self>[0][]
+      | Maybe<ConstructorParameters<Self>[0][]>
   ) {
     /**
      * If optional values are allowed and the value is undefined, then
@@ -128,7 +145,50 @@ export abstract class BaseTransformer<T> {
       return undefined
     }
 
-    return new Collection(unwrappedValue, this, 1, 'toObject', new RuntimeException())
+    if (Array.isArray(unwrappedValue)) {
+      return new Collection(unwrappedValue, this, 1, 'toObject', new RuntimeException())
+    }
+
+    if (unwrappedValue === null) {
+      return null
+    }
+
+    return new Item<InstanceType<Self>, 1, 'toObject'>(
+      unwrappedValue,
+      this,
+      1,
+      'toObject',
+      new RuntimeException()
+    )
+  }
+
+  /**
+   * Create a paginated collection from an array of data
+   *
+   * @param data - Array of data objects to transform into a paginated collection
+   *
+   * @example
+   * ```ts
+   * class UserTransformer extends BaseTransformer<User> {
+   *   toObject() {
+   *     return { id: this.resource.id, name: this.resource.name }
+   *   }
+   * }
+   *
+   * // Create paginated collection
+   * const paginatedUsers = UserTransformer.paginate([user1, user2, user3])
+   * ```
+   */
+  static paginate<Self extends { new (...args: any[]): any }, MetaData extends Record<string, any>>(
+    this: Self,
+    data: ConstructorParameters<Self>[0][],
+    metaData: MetaData
+  ): Paginator<Collection<InstanceType<Self>, 1, 'toObject'>, 'data', MetaData> {
+    return new Paginator(
+      new Collection(data, this, 1, 'toObject', new RuntimeException()),
+      'data',
+      metaData
+    )
   }
 
   /**

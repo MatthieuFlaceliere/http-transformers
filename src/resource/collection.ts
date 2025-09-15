@@ -10,19 +10,43 @@
 import type { ContainerResolver } from '@adonisjs/fold'
 import { type RuntimeException } from '@poppinss/exception'
 
-import { serialize } from './helpers.js'
-import { type ExtractResourceVariants, type InferData, type Next } from './types.js'
+import { transformAndSerialize } from '../utils.ts'
+import { type InferData, type ExtractTransformerVariants, type Next } from '../types.ts'
 
 /**
- * Represents a collection of transformers created for an
- * array of source data.
+ * Represents a collection of transformers created for an array of source data.
+ * Provides functionality to transform multiple data items into a consistent format.
+ *
+ * @template Transformer - The transformer class used to transform individual items
+ * @template MaxDepth - Maximum depth for nested transformations
+ * @template Variant - The transformer method variant to use for serialization
+ *
+ * @example
+ * ```ts
+ * class UserTransformer extends BaseTransformer<User> {
+ *   toObject() {
+ *     return { id: this.resource.id, name: this.resource.name }
+ *   }
+ * }
+ *
+ * const users = [user1, user2, user3]
+ * const collection = UserTransformer.collection(users)
+ * const serialized = await collection.serialize(container, 0, 2)
+ * ```
  */
 export class Collection<
   Transformer extends Record<string, any>,
-  Depth extends number,
+  MaxDepth extends Next[number],
   Variant extends string,
 > {
+  /**
+   * Private debugging error instance for troubleshooting
+   */
   #debuggingError: RuntimeException
+
+  /**
+   * Type identifier for the collection resource
+   */
   $type: 'collection' = 'collection'
 
   /**
@@ -46,9 +70,9 @@ export class Collection<
    * ```
    */
   constructor(
-    protected transformerData: any[] | undefined,
+    protected transformerData: any[],
     protected transformer: { new (...args: any[]): Transformer },
-    protected maxDepth: Depth,
+    protected maxDepth: MaxDepth,
     protected variant: Variant,
     debuggingError: RuntimeException
   ) {
@@ -88,9 +112,9 @@ export class Collection<
    *   .useVariant('toSummary') // Use toSummary() instead of toObject()
    * ```
    */
-  useVariant<V extends ExtractResourceVariants<Transformer>>(
+  useVariant<V extends ExtractTransformerVariants<Transformer>>(
     value: V
-  ): Collection<Transformer, Depth, V> {
+  ): Collection<Transformer, MaxDepth, V> {
     return new Collection(
       this.transformerData,
       this.transformer,
@@ -113,36 +137,17 @@ export class Collection<
    * const serialized = await posts.serialize(container, 0, 2)
    * ```
    */
-  serialize(
-    container: ContainerResolver<any>,
-    depth: number,
-    maxDepth?: number
-  ): Promise<InferData<Transformer, Variant>[]> {
-    /**
-     * If its undefined after unpacking, then throw an error
-     */
-    if (this.transformerData === undefined) {
-      this.#debuggingError.message =
-        'Cannot transform a collection with undefined value. Use "this.whenLoaded(value)" to allow undefined values'
-      throw this.#debuggingError
-    }
-
-    if (!Array.isArray(this.transformerData)) {
-      this.#debuggingError.message = `Collection requires an array of values to transform. Instead received ${typeof this.transformerData}`
-      throw this.#debuggingError
-    }
-
+  serialize(container: ContainerResolver<any>, depth: number, maxDepth?: number) {
     return Promise.all(
-      this.transformerData.map(
-        (row) =>
-          serialize(
-            container,
-            new this.transformer(row),
-            this.variant,
-            depth,
-            maxDepth ?? this.maxDepth
-          ) as Promise<InferData<Transformer, Variant>>
+      this.transformerData.map((row) =>
+        transformAndSerialize(
+          container,
+          new this.transformer(row),
+          this.variant,
+          depth,
+          maxDepth === -1 ? undefined : (maxDepth ?? this.maxDepth)
+        )
       )
-    )
+    ) as Promise<InferData<Transformer, Variant>[]>
   }
 }

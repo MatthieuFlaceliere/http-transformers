@@ -1,6 +1,6 @@
 // @ts-ignore
 import Benchmark from 'benchmark'
-import { type ResourceDataTypes } from '../src/types.js'
+import { type ResourceDataTypes } from '../src/types.ts'
 const suite = new Benchmark.Suite()
 
 function lazy<T>(resolver: T): T {

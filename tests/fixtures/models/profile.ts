@@ -1,5 +1,5 @@
-import { type Email } from './email.js'
-import type { User } from './user.js'
+import { type Email } from './email.ts'
+import type { User } from './user.ts'
 
 export class Profile {
   declare id: number
