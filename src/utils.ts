@@ -12,9 +12,9 @@ import type { ContainerResolver } from '@adonisjs/fold'
 
 import { debug } from './debug.ts'
 import { Item } from './resource/item.ts'
+import { Paginator } from './paginator.ts'
 import { Collection } from './resource/collection.ts'
 import type { JSONDataTypes, ResourceData } from './types.ts'
-import { Paginator } from './paginator.ts'
 
 /**
  * Checks if value is an object excluding Arrays and null values

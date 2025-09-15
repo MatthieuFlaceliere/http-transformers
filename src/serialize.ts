@@ -7,6 +7,7 @@
  * file that was distributed with this source code.
  */
 
+import { RuntimeException } from '@poppinss/exception'
 import { Container, type ContainerResolver } from '@adonisjs/fold'
 
 import { Item } from './resource/item.ts'
@@ -14,7 +15,6 @@ import { Paginator } from './paginator.ts'
 import { serializeValues } from './utils.ts'
 import { Collection } from './resource/collection.ts'
 import type { ResourceDataTypes, SerializeFn } from './types.ts'
-import { RuntimeException } from '@poppinss/exception'
 
 /**
  * Main serialization function that converts transformer data into plain JavaScript objects.

@@ -64,12 +64,40 @@ export class Paginator<
     protected metaData: MetaData
   ) {}
 
+  /**
+   * Sets a new data property name for the paginated result
+   *
+   * @param dataProp - The new property name for the data array
+   *
+   * @example
+   * ```ts
+   * const paginator = new Paginator(collection, 'data', { page: 1 })
+   * const newPaginator = paginator.setDataProp('users')
+   * // Result will have 'users' instead of 'data' as the key
+   * ```
+   */
   setDataProp<Value extends string>(
     dataProp: Value
   ): Paginator<PaginatorCollection, Value, MetaData> {
     return new Paginator(this.collection, dataProp, this.metaData)
   }
 
+  /**
+   * Updates the pagination metadata with new values
+   *
+   * @param metaData - New metadata object or a function that receives current metadata and returns new metadata
+   *
+   * @example
+   * ```ts
+   * const paginator = new Paginator(collection, 'data', { page: 1, total: 100 })
+   *
+   * // Set new metadata
+   * const updated = paginator.setMetaData({ page: 2, total: 150, hasMore: true })
+   *
+   * // Update existing metadata
+   * const incremented = paginator.setMetaData(meta => ({ ...meta, page: meta.page + 1 }))
+   * ```
+   */
   setMetaData<Value extends Record<string, any>>(
     metaData: Value | ((data: MetaData) => Value)
   ): Paginator<PaginatorCollection, DataProp, Value> {

@@ -11,8 +11,8 @@ import { RuntimeException } from '@poppinss/exception'
 
 import { Maybe } from './maybe.ts'
 import { Item } from './resource/item.ts'
-import { Collection } from './resource/collection.ts'
 import { Paginator } from './paginator.ts'
+import { Collection } from './resource/collection.ts'
 
 /**
  * Serves as the base for creating custom data transformers.
