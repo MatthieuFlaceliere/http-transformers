@@ -100,22 +100,29 @@ export async function serializeValues(
   depth: number,
   maxDepth?: number
 ) {
-  let output: JSONDataTypes = {}
+  const promises: Promise<[string, any]>[] = []
+  const output: JSONDataTypes = {}
+
   for (const [key, value] of Object.entries(input)) {
     if (value instanceof Item || value instanceof Collection || value instanceof Paginator) {
       debug('resolving key "%s" with maxDepth="%s" and depth="%s"', key, maxDepth, depth)
       if (maxDepth && maxDepth !== -1 && depth >= maxDepth) {
         continue
       } else {
-        output[key] = await value.serialize(
-          container,
-          maxDepth === -1 ? depth : depth + 1,
-          maxDepth
+        promises.push(
+          value
+            .serialize(container, maxDepth === -1 ? depth : depth + 1, maxDepth)
+            .then((result) => [key, result])
         )
       }
     } else {
       output[key] = value
     }
+  }
+
+  const resolvedPromises = await Promise.all(promises)
+  for (const [key, value] of resolvedPromises) {
+    output[key] = value
   }
 
   return output
