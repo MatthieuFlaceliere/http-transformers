@@ -1218,4 +1218,10 @@ test.group('Transformer', () => {
       }[]
     }>()
   })
+
+  test('return non-serializable values as it is', async ({ assert, expectTypeOf }) => {
+    const userData = await serialize([1, 2, 3] as const)
+    expectTypeOf(userData).toEqualTypeOf<readonly [1, 2, 3]>()
+    assert.deepEqual(userData, [1, 2, 3])
+  })
 })

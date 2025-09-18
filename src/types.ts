@@ -94,10 +94,13 @@ export type CanBeSerialized<T extends JSONDataTypes> = {
 export type JSONDataTypes = JSONValues | JSONDataTypes[] | { [key: string]: JSONDataTypes }
 
 /**
- * Extracts the variant methods of a resource. Any method that returns ResourceData
- * can be picked for serialization
+ * Extracts the variant methods of a transformer class. Any method that returns ResourceData
+ * or Promise<ResourceData> can be picked for serialization.
  *
- * @template Transformer - The resource class to extract variants from
+ * This utility type filters all methods of a transformer class to only include those
+ * that return the correct data types for resource serialization.
+ *
+ * @template Transformer - The transformer class to extract variant methods from
  *
  * @example
  * ```typescript
@@ -107,7 +110,7 @@ export type JSONDataTypes = JSONValues | JSONDataTypes[] | { [key: string]: JSON
  *   invalidMethod() { return "not resource data" }
  * }
  *
- * type Variants = ExtractResourceVariants<UserResource> // "toObject" | "toSummary"
+ * type Variants = ExtractTransformerVariants<UserResource> // "toObject" | "toSummary"
  * ```
  */
 export type ExtractTransformerVariants<Transformer> = {
@@ -502,4 +505,15 @@ export type SerializeFn = {
     paginator: ResourcePaginator,
     container?: ContainerResolver<any>
   ): Promise<UnpackAsPaginator<ResourcePaginator, -1, 0, true>>
+
+  /**
+   * Serializes any other value by returning it as-is wrapped in a Promise.
+   * This fallback overload handles values that don't match the specific resource types.
+   *
+   * @template Value - The value type to serialize
+   * @param value - The value to serialize
+   * @param container - Optional container resolver for dependency injection
+   * @returns Promise resolving to the original value unchanged
+   */
+  <Value>(value: Value, container?: ContainerResolver<any>): Promise<Value>
 }

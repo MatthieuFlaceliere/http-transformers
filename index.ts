@@ -9,6 +9,7 @@
 
 export { Maybe } from './src/maybe.ts'
 export { Item } from './src/resource/item.ts'
+export { Paginator } from './src/paginator.ts'
 export { serialize } from './src/serialize.ts'
 export { Collection } from './src/resource/collection.ts'
 export { BaseTransformer } from './src/base_transformer.ts'
