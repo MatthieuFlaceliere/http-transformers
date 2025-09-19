@@ -10,7 +10,7 @@
 import { test } from '@japa/runner'
 import { debug } from '../src/debug.ts'
 import { serialize } from '../src/serialize.ts'
-import { type InferData } from '../src/types.ts'
+import { type InferVariants, type InferData } from '../src/types.ts'
 import { User } from './fixtures/models/user.ts'
 import { Post } from './fixtures/models/posts.ts'
 import { Email } from './fixtures/models/email.ts'
@@ -231,5 +231,31 @@ test.group('Types | Fixtures', () => {
       }
     }>()
     expectTypeOf(emailDataObject).toEqualTypeOf<EmailData>()
+  })
+
+  test('infer all variants of a transformer', async ({ expectTypeOf }) => {
+    const user = new User()
+    const userTransformer = new UserTransformer(user)
+    const userDataObject = await serialize(UserTransformer.transform(user).useVariant('basicInfo'))
+
+    type UserData = InferVariants<typeof userTransformer>
+    debug('%O', userDataObject)
+
+    expectTypeOf<UserData>().toEqualTypeOf<{
+      basicInfo: {
+        id: number
+        name: string
+        profile?:
+          | {
+              id: number
+              twitterHandle: string | null
+              githubUsername: string | null
+            }
+          | null
+          | undefined
+      }
+    }>()
+
+    expectTypeOf(userDataObject).toEqualTypeOf<UserData['basicInfo']>()
   })
 })

@@ -13,6 +13,7 @@ import { type ContainerResolver } from '@adonisjs/fold'
 import type { Item } from './resource/item.ts'
 import { type Paginator } from './paginator.ts'
 import type { Collection } from './resource/collection.ts'
+import { type BaseTransformer } from './base_transformer.ts'
 
 /**
  * Counter to increment the depth. At max we will allow fetching
@@ -433,6 +434,42 @@ export type InferData<
 > = Transformer extends { [K in Variant]: (...args: any[]) => unknown }
   ? UnpackValues<Awaited<ReturnType<Transformer[Variant]>>, MaxDepth, Depth, false>
   : never
+
+/**
+ * Infers the data structure for all variant methods of a transformer class, excluding
+ * the default 'toObject' method and base transformer methods.
+ *
+ * @template Transformer - The resource class to infer variant data from
+ * @template MaxDepth - Maximum depth allowed for unpacking (defaults to -1 for unlimited)
+ * @template Depth - Current depth level (defaults to 0)
+ *
+ * @example
+ * ```typescript
+ * class UserResource {
+ *   toObject() { return { id: 1, name: "John" } }
+ *   toSummary() { return { id: 1 } }
+ *   toProfile() { return { id: 1, name: "John", email: "john@example.com" } }
+ * }
+ *
+ * type UserVariants = InferVariants<UserResource>
+ * // Result: {
+ * //   toSummary: { id: number }
+ * //   toProfile: { id: number; name: string; email: string }
+ * // }
+ * ```
+ */
+export type InferVariants<Transformer, MaxDepth extends number = -1, Depth extends number = 0> = {
+  [O in {
+    [K in keyof Transformer]: 'toObject' extends K
+      ? never
+      : K extends keyof BaseTransformer<any>
+        ? never
+        : Transformer[K] extends (...args: any[]) => unknown
+          ? K
+          : never
+  }[keyof Transformer] &
+    string]: InferData<Transformer, O, MaxDepth, Depth>
+}
 
 /**
  * Function interface for the main serialize function that handles different data types.
