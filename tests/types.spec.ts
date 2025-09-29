@@ -258,4 +258,39 @@ test.group('Types | Fixtures', () => {
 
     expectTypeOf(userDataObject).toEqualTypeOf<UserData['basicInfo']>()
   })
+
+  test('pick and method method to filter out functions', async () => {
+    class UserPost {
+      declare id: number
+      declare title: string
+      declare content: string
+      declare author?: User
+      declare authorConstructor?: typeof User
+      async save() {}
+      async create(_: any) {}
+      async update(_: any) {}
+    }
+
+    class CustomPostTransformer extends BaseTransformer<UserPost> {
+      toObject() {
+        // @ts-expect-error
+        this.pick(this.resource, ['save'])
+        // @ts-expect-error
+        this.pick(this.resource, ['create'])
+        // @ts-expect-error
+        this.pick(this.resource, ['update'])
+        this.pick(this.resource, ['id', 'title', 'authorConstructor', 'author', 'content'])
+
+        // @ts-expect-error
+        this.omit(this.resource, ['save'])
+        // @ts-expect-error
+        this.omit(this.resource, ['create'])
+        // @ts-expect-error
+        this.omit(this.resource, ['update'])
+        this.omit(this.resource, ['id', 'title', 'authorConstructor', 'author', 'content'])
+      }
+    }
+
+    new CustomPostTransformer(new UserPost())
+  })
 })

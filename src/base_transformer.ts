@@ -245,10 +245,10 @@ export abstract class BaseTransformer<T> {
    * }
    * ```
    */
-  omit<Data extends Record<string, any>, Keys extends keyof Data>(
-    data: Data,
-    keys: Keys[] | readonly Keys[]
-  ): Exclude<Data, Keys> {
+  omit<
+    Data extends Record<string, any>,
+    Keys extends { [K in keyof Data]: Data[K] extends Function ? never : K }[keyof Data],
+  >(data: Data, keys: Keys[] | readonly Keys[]): Exclude<Data, Keys> {
     const result = { ...data }
     for (const key of keys) {
       delete result[key]
@@ -272,10 +272,10 @@ export abstract class BaseTransformer<T> {
    * }
    * ```
    */
-  pick<Data extends Record<string, any>, Keys extends keyof Data>(
-    data: Data,
-    keys: Keys[] | readonly Keys[]
-  ): Pick<Data, Keys> {
+  pick<
+    Data extends Record<string, any>,
+    Keys extends { [K in keyof Data]: Data[K] extends Function ? never : K }[keyof Data],
+  >(data: Data, keys: Keys[] | readonly Keys[]): Pick<Data, Keys> {
     const result = {} as Pick<Data, Keys>
     for (const key of keys) {
       result[key] = data[key]
