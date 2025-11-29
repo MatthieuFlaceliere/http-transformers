@@ -8,7 +8,6 @@
  */
 
 import type { ContainerResolver } from '@adonisjs/fold'
-
 import { type UnpackAsCollection } from './types.ts'
 import { type Collection } from './resource/collection.ts'
 

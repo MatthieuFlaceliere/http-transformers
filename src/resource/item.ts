@@ -11,7 +11,7 @@ import type { ContainerResolver } from '@adonisjs/fold'
 import type { RuntimeException } from '@poppinss/exception'
 
 import { transformAndSerialize } from '../utils.ts'
-import type { ExtractTransformerVariants, InferData, Next } from '../types.ts'
+import type { ExtractTransformerVariants, Next, UnpackAsItem } from '../types.ts'
 
 /**
  * Represents a transformer created for a single source item.
@@ -72,9 +72,9 @@ export class Item<
    */
   constructor(
     protected transformerData: any,
-    protected transformer: { new (...args: any[]): Transformer },
-    protected maxDepth: MaxDepth,
-    protected variant: Variant,
+    public transformer: { new (...args: any[]): Transformer },
+    public maxDepth: MaxDepth,
+    public variant: Variant,
     debuggingError: RuntimeException
   ) {
     this.#debuggingError = debuggingError
@@ -138,11 +138,7 @@ export class Item<
    * const serialized = await user.serialize(container, 0, 2)
    * ```
    */
-  serialize(
-    container: ContainerResolver<any>,
-    depth: number,
-    maxDepth?: number
-  ): Promise<InferData<Transformer, Variant>> {
+  serialize(container: ContainerResolver<any>, depth: number, maxDepth?: number) {
     /**
      * If its undefined after unpacking, then throw an error
      */
@@ -158,6 +154,6 @@ export class Item<
       this.variant,
       depth,
       maxDepth === -1 ? undefined : (maxDepth ?? this.maxDepth)
-    ) as Promise<InferData<Transformer, Variant>>
+    ) as unknown as Promise<UnpackAsItem<Item<Transformer, MaxDepth, Variant>, -1, 0, true>>
   }
 }

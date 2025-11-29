@@ -7,13 +7,14 @@
  * file that was distributed with this source code.
  */
 
+import { type Jsonify } from 'type-fest'
 import { type Prettify } from '@poppinss/types'
 import { type ContainerResolver } from '@adonisjs/fold'
 
-import type { Item } from './resource/item.ts'
 import { type Paginator } from './paginator.ts'
-import type { Collection } from './resource/collection.ts'
 import { type BaseTransformer } from './base_transformer.ts'
+import { type Collection } from './resource/collection.ts'
+import { type Item } from './resource/item.ts'
 
 /**
  * Counter to increment the depth. At max we will allow fetching
@@ -27,6 +28,8 @@ import { type BaseTransformer } from './base_transformer.ts'
  * ```
  */
 export type Next = [1, 2, 3, 4, 5, 6]
+
+export type JSONPrimitives = string | number | bigint | boolean | null | undefined
 
 /**
  * Values that are JSON.stringify friendly
@@ -45,15 +48,7 @@ export type Next = [1, 2, 3, 4, 5, 6]
  * ]
  * ```
  */
-export type JSONValues =
-  | string
-  | number
-  | bigint
-  | boolean
-  | Date
-  | null
-  | undefined
-  | CanBeSerialized<any>
+export type JSONValues = JSONPrimitives | Date | CanBeSerialized<any>
 
 /**
  * Representation of a value object that can be serialized to JSON
@@ -93,6 +88,38 @@ export type CanBeSerialized<T extends JSONDataTypes> = {
  * ```
  */
 export type JSONDataTypes = JSONValues | JSONDataTypes[] | { [key: string]: JSONDataTypes }
+
+export type GetOptional<T> = {
+  [K in keyof T]: [undefined] extends [T[K]] ? K : never
+}[keyof T]
+export type GetRequired<T> = {
+  [K in keyof T]: [undefined] extends [T[K]] ? never : K
+}[keyof T]
+
+export type SerializeJSONObject<T> = {
+  [K in keyof T]: T[K]
+}
+
+type JsonifyList<T extends unknown[]> = T extends readonly []
+  ? []
+  : Array<SerializeJSONTypes<T[number]>>
+
+export type UndefinedToOptional<T extends object> = {
+  [Key in GetRequired<T>]: T[Key]
+} & {
+  [Key in GetOptional<T>]?: T[Key]
+}
+
+export type SerializeJSONTypes<T> =
+  T extends CanBeSerialized<infer A>
+    ? SerializeJSONTypes<A>
+    : T extends JSONPrimitives
+      ? T
+      : T extends unknown[]
+        ? JsonifyList<T>
+        : T extends object
+          ? Prettify<SerializeJSONObject<UndefinedToOptional<T>>>
+          : string
 
 /**
  * Extracts the variant methods of a transformer class. Any method that returns ResourceData
@@ -182,11 +209,7 @@ export type UnpackKeyValue<
     ? UnpackAsCollection<Value, MaxDepth, Depth, AtTopLevel>
     : [Paginator<any, any, any>] extends [Value]
       ? UnpackAsPaginator<Value, MaxDepth, Depth, AtTopLevel>
-      : Value extends CanBeSerialized<infer B>
-        ? B
-        : Value extends JSONDataTypes
-          ? Value
-          : string
+      : Jsonify<Value>
 
 /**
  * Validates the Depth property against the MaxDepth and drops the key

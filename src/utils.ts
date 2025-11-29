@@ -112,7 +112,7 @@ export async function serializeValues(
         promises.push(
           value
             .serialize(container, maxDepth === -1 ? depth : depth + 1, maxDepth)
-            .then((result) => [key, result])
+            .then((result: any) => [key, result])
         )
       }
     } else {

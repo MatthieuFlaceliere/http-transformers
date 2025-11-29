@@ -10,7 +10,6 @@
 import { test } from '@japa/runner'
 import { debug } from '../src/debug.ts'
 import { serialize } from '../src/serialize.ts'
-import { type InferVariants, type InferData } from '../src/types.ts'
 import { User } from './fixtures/models/user.ts'
 import { Post } from './fixtures/models/posts.ts'
 import { Email } from './fixtures/models/email.ts'
@@ -19,6 +18,7 @@ import { BaseTransformer } from '../src/base_transformer.ts'
 import { PostTransformer } from './fixtures/transformers/post.ts'
 import { UserTransformer } from './fixtures/transformers/user.ts'
 import { EmailTransformer } from './fixtures/transformers/email.ts'
+import { type InferVariants, type InferData } from '../src/types.ts'
 import { ProfileTransformer } from './fixtures/transformers/profile.ts'
 
 test.group('Types', () => {
@@ -55,6 +55,113 @@ test.group('Types', () => {
         id: number
         emails: { id: number; email: string }[]
       }
+      can: {
+        create: boolean
+        edit: boolean
+      }
+    }>()
+    expectTypeOf(exampleDataObject).toEqualTypeOf<ExampleData>()
+  })
+
+  test('infer rich data-types', async ({ expectTypeOf }) => {
+    class Checks {
+      toJSON() {
+        return {
+          edit: true,
+          create: true,
+        }
+      }
+    }
+
+    class ExampleTransformer extends BaseTransformer<{}> {
+      toObject() {
+        return {
+          id: 1,
+          profile: {
+            id: 1,
+            emails: [
+              {
+                id: 1,
+                email: 'foo@bar.com',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            ],
+          },
+          can: new Checks(),
+        }
+      }
+    }
+
+    const exampleTransformer = new ExampleTransformer({})
+    const exampleDataObject = await serialize(ExampleTransformer.transform({}))
+    type ExampleData = InferData<typeof exampleTransformer>
+    debug('%O', exampleDataObject)
+
+    expectTypeOf<ExampleData>().toEqualTypeOf<{
+      id: number
+      profile: {
+        id: number
+        emails: { id: number; email: string; createdAt: string; updatedAt: string }[]
+      }
+      can: {
+        create: boolean
+        edit: boolean
+      }
+    }>()
+    expectTypeOf(exampleDataObject).toEqualTypeOf<ExampleData>()
+  })
+
+  test('infer rich data-types with optional values', async ({ expectTypeOf }) => {
+    class Checks {
+      toJSON() {
+        return {
+          edit: true,
+          create: true,
+        }
+      }
+    }
+
+    class ExampleTransformer extends BaseTransformer<{}> {
+      hasProfile: boolean = true
+      toObject() {
+        return {
+          id: 1,
+          profile: this.hasProfile
+            ? {
+                id: 1,
+                emails: this.hasProfile
+                  ? [
+                      {
+                        id: 1,
+                        email: 'foo@bar.com',
+                        createdAt: this.hasProfile ? new Date() : undefined,
+                        updatedAt: new Date(),
+                      },
+                    ]
+                  : undefined,
+              }
+            : undefined,
+          can: new Checks(),
+        }
+      }
+    }
+
+    const exampleTransformer = new ExampleTransformer({})
+    const exampleDataObject = await serialize(ExampleTransformer.transform({}))
+    type ExampleData = InferData<typeof exampleTransformer>
+    debug('%O', exampleDataObject)
+
+    expectTypeOf<ExampleData>().toEqualTypeOf<{
+      id: number
+      profile?:
+        | {
+            id: number
+            emails?:
+              | { id: number; email: string; createdAt?: string | undefined; updatedAt: string }[]
+              | undefined
+          }
+        | undefined
       can: {
         create: boolean
         edit: boolean
