@@ -86,6 +86,16 @@ export type JSONDataTypes = JSONValues | JSONDataTypes[] | { [key: string]: JSON
 
 /**
  * Helper type to serialize object types while preserving required and optional properties.
+ * Separates defined properties from undefined/optional ones to maintain correct optionality
+ * in the resulting serialized type.
+ *
+ * @template T - The object type to serialize
+ *
+ * ```typescript
+ * type User = { id: number; name: string; email?: string }
+ * type SerializedUser = SerializeJSONObject<User>
+ * // Result: { id: number; name: string } & { email?: string }
+ * ```
  */
 export type SerializeJSONObject<T> = {
   [K in ExtractDefined<T>]: SerializeJSONTypes<T[K]>
@@ -93,14 +103,53 @@ export type SerializeJSONObject<T> = {
   [K in ExtractUndefined<T>]?: SerializeJSONTypes<T[K]>
 }
 
+/**
+ * Extension point to allow custom types in JSON serialization. Use declaration
+ * merging to add additional types that should be allowed in JSON output.
+ *
+ * ```typescript
+ * declare module '@adonisjs/http-transformers' {
+ *   interface ExtendJSONTypes {
+ *     customDate: MyCustomDateType
+ *   }
+ * }
+ * ```
+ */
 export interface ExtendJSONTypes {}
+
+/**
+ * Types that are not allowed in JSON serialization by default.
+ * Map and Set instances cannot be directly serialized to JSON.
+ */
 export type NonAllowedJSTypes = Map<any, any> | Set<any>
+
+/**
+ * Union of all types that have been explicitly allowed via the ExtendJSONTypes
+ * interface extension point.
+ */
 export type ForcefullyAllowedTypes = {
   [K in keyof ExtendJSONTypes]: ExtendJSONTypes[K]
 }[keyof ExtendJSONTypes]
 
 /**
  * Helper type to recursively serialize types, handling primitives, arrays, and objects.
+ * This type walks through the type hierarchy and converts each level to its JSON-serializable
+ * equivalent.
+ *
+ * @template T - The type to serialize
+ *
+ * The type checks in order:
+ * 1. If T is a primitive (string, number, boolean, etc.), return as-is
+ * 2. If T is explicitly allowed via ExtendJSONTypes, return as-is
+ * 3. If T is a non-allowed type (Map, Set), return never
+ * 4. If T is an array, recursively serialize array items
+ * 5. If T is an object, recursively serialize object properties
+ *
+ * ```typescript
+ * type Input = { name: string; tags: string[]; meta: { count: number } }
+ * type Output = SerializeJSONOwnTypes<Input>
+ * // Result: { name: string; tags: string[]; meta: { count: number } }
+ * ```
  */
 export type SerializeJSONOwnTypes<T> = T extends JSONPrimitives
   ? T
@@ -115,48 +164,141 @@ export type SerializeJSONOwnTypes<T> = T extends JSONPrimitives
           : never
 
 /**
- * Main serialization type that handles objects with toJSON methods.
+ * Main serialization type that handles objects with toJSON methods. If a type
+ * has a toJSON method, extracts and serializes the return type. Otherwise,
+ * serializes the type directly.
+ *
+ * @template T - The type to serialize
+ *
+ * ```typescript
+ * class User {
+ *   constructor(public id: number, public name: string) {}
+ *   toJSON() {
+ *     return { id: this.id, name: this.name }
+ *   }
+ * }
+ *
+ * type SerializedUser = SerializeJSONTypes<User>
+ * // Result: { id: number; name: string }
+ * ```
  */
 export type SerializeJSONTypes<T> =
   T extends CanBeSerialized<infer A> ? SerializeJSONOwnTypes<A> : SerializeJSONOwnTypes<T>
 
 /**
- * Contract interface for Item instances used in type inference.
+ * Contract interface for Item instances used in type inference. An Item represents
+ * a single resource that will be transformed using the specified transformer class.
+ *
+ * @template Transformer - The transformer class to use for transforming the resource
+ * @template MaxDepth - The maximum depth for nested resource resolution
+ * @template Variant - The variant method name to use for transformation
+ *
+ * ```typescript
+ * const userItem: ItemContract<UserTransformer, 3, 'toObject'> = {
+ *   $type: 'item',
+ *   transformer: UserTransformer,
+ *   maxDepth: 3,
+ *   variant: 'toObject'
+ * }
+ * ```
  */
 export interface ItemContract<
   Transformer extends Record<string, any>,
   MaxDepth extends Next[number],
   Variant extends string,
 > {
+  /**
+   * Discriminator property to identify this as an Item type
+   */
   $type: 'item'
+  /**
+   * The transformer class constructor used for transforming the resource
+   */
   transformer: { new (...args: any[]): Transformer }
+  /**
+   * Maximum depth for resolving nested resources
+   */
   maxDepth: MaxDepth
+  /**
+   * The variant method name to call on the transformer
+   */
   variant: Variant
 }
 
 /**
- * Contract interface for Collection instances used in type inference.
+ * Contract interface for Collection instances used in type inference. A Collection
+ * represents an array of resources that will be transformed using the specified
+ * transformer class.
+ *
+ * @template Transformer - The transformer class to use for transforming each resource
+ * @template MaxDepth - The maximum depth for nested resource resolution
+ * @template Variant - The variant method name to use for transformation
+ *
+ * ```typescript
+ * const usersCollection: CollectionContract<UserTransformer, 3, 'toObject'> = {
+ *   $type: 'collection',
+ *   transformer: UserTransformer,
+ *   maxDepth: 3,
+ *   variant: 'toObject'
+ * }
+ * ```
  */
 export interface CollectionContract<
   Transformer extends Record<string, any>,
   MaxDepth extends Next[number],
   Variant extends string,
 > {
+  /**
+   * Discriminator property to identify this as a Collection type
+   */
   $type: 'collection'
+  /**
+   * The transformer class constructor used for transforming each resource
+   */
   transformer: { new (...args: any[]): Transformer }
+  /**
+   * Maximum depth for resolving nested resources
+   */
   maxDepth: MaxDepth
+  /**
+   * The variant method name to call on the transformer
+   */
   variant: Variant
 }
 
 /**
- * Contract interface for Paginator instances used in type inference.
+ * Contract interface for Paginator instances used in type inference. A Paginator
+ * wraps a Collection with additional pagination metadata.
+ *
+ * @template PaginatorCollection - The collection contract containing the paginated data
+ * @template MetaData - The pagination metadata type (page numbers, counts, etc.)
+ *
+ * ```typescript
+ * const usersPaginator: PaginatorContract<
+ *   CollectionContract<UserTransformer, 3, 'toObject'>,
+ *   { currentPage: number; total: number }
+ * > = {
+ *   $type: 'paginator',
+ *   collection: usersCollection,
+ *   metaData: { currentPage: 1, total: 100 }
+ * }
+ * ```
  */
 export interface PaginatorContract<
   PaginatorCollection extends CollectionContract<any, any, any>,
   MetaData extends Record<string, any>,
 > {
+  /**
+   * Discriminator property to identify this as a Paginator type
+   */
   $type: 'paginator'
+  /**
+   * The collection contract containing the paginated resources
+   */
   collection: PaginatorCollection
+  /**
+   * Pagination metadata (page numbers, total count, etc.)
+   */
   metaData: MetaData
 }
 
@@ -226,7 +368,12 @@ export type ResourceData = Record<string, ResourceDataTypes>
 
 /**
  * Unpacks the value of a key inside ResourceData. Collections and Items
- * are recursively processed with depth tracking.
+ * are recursively processed with depth tracking. This type handles the
+ * splitting between resource types (Item/Collection) and plain JSON types.
+ *
+ * @template Value - A tuple of [ResourceType | never, OtherTypes] from SplitItm
+ * @template MaxDepth - Maximum depth allowed for unpacking nested resources
+ * @template Depth - Current depth level in the unpacking process
  *
  * @internal
  */
@@ -282,6 +429,12 @@ export type LimitDepth<Key, Value, MaxDepth extends number, Depth extends number
 
 /**
  * Only unpacks values that can be undefined and marks them as optional.
+ * This type filters out required properties and processes only those that
+ * allow undefined values.
+ *
+ * @template Data - The resource data object to unpack
+ * @template MaxDepth - Maximum depth allowed for unpacking nested resources
+ * @template Depth - Current depth level in the unpacking process
  *
  * @internal
  */
@@ -295,6 +448,12 @@ export type UnpackOptionalValues<Data, MaxDepth extends number, Depth extends nu
 
 /**
  * Only unpacks defined (including null) values as required properties.
+ * This type filters out optional properties and processes only those that
+ * are always defined (though they may be null).
+ *
+ * @template Data - The resource data object to unpack
+ * @template MaxDepth - Maximum depth allowed for unpacking nested resources
+ * @template Depth - Current depth level in the unpacking process
  *
  * @internal
  */
@@ -308,6 +467,10 @@ export type UnpackRequiredValues<Data, MaxDepth extends number, Depth extends nu
 
 /**
  * Internal helper type to split Item/Collection types from other types.
+ * Returns a tuple where the first element contains extracted resource types
+ * (Item/Collection) and the second contains all other types.
+ *
+ * @template T - The type to split
  *
  * @internal
  */
@@ -317,7 +480,10 @@ export type SplitItm<T> = [
 ]
 
 /**
- * Unpacks an Item instance at the top level of serialization.
+ * Unpacks an Item instance at the top level of serialization. When an Item
+ * is at the root level, it uses unlimited depth (-1) starting from depth 0.
+ *
+ * @template T - The Item contract type to unpack
  *
  * @internal
  */
@@ -327,7 +493,10 @@ export type UnpackAsTopLevelItem<T> =
     : never
 
 /**
- * Unpacks a Collection instance at the top level of serialization.
+ * Unpacks a Collection instance at the top level of serialization. Returns
+ * an array of the unpacked transformer data with unlimited depth.
+ *
+ * @template T - The Collection contract type to unpack
  *
  * @internal
  */
@@ -337,7 +506,11 @@ export type UnpackAsTopLevelCollection<T> =
     : never
 
 /**
- * Unpacks a Paginator instance at the top level of serialization.
+ * Unpacks a Paginator instance at the top level of serialization. Returns
+ * an object with a 'data' array containing the unpacked collection items
+ * and a 'meta' object containing pagination metadata.
+ *
+ * @template T - The Paginator contract type to unpack
  *
  * @internal
  */
@@ -351,7 +524,12 @@ export type UnpackAsTopLevelPaginator<T> =
 
 /**
  * Unpacks values as two sets of optional and required values, then merges them
- * into a single prettified type.
+ * into a single prettified type. This ensures correct optionality is preserved
+ * in the resulting serialized type.
+ *
+ * @template Data - The resource data object to unpack
+ * @template MaxDepth - Maximum depth allowed for unpacking nested resources
+ * @template Depth - Current depth level in the unpacking process
  *
  * @internal
  */
@@ -360,7 +538,20 @@ export type UnpackValues<Data, MaxDepth extends number, Depth extends number> = 
 >
 
 /**
- * Unpack as top-level data object
+ * Unpacks resource data at the top level of serialization. Handles special
+ * cases like Paginator objects which need to be wrapped in a data/meta structure.
+ * Uses unlimited depth (-1) for top-level unpacking.
+ *
+ * @template Data - The resource data object to unpack
+ *
+ * ```typescript
+ * type Input = {
+ *   user: ItemContract<UserTransformer, 3, 'toObject'>
+ *   posts: CollectionContract<PostTransformer, 3, 'toObject'>
+ * }
+ * type Output = UnpackTopLevelValues<Input>
+ * // Result: { user: UserData; posts: PostData[] }
+ * ```
  */
 export type UnpackTopLevelValues<Data> = Prettify<
   {
