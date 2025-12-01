@@ -42,8 +42,8 @@ export class Paginator<
    * Creates a new Paginator instance. This constructor is typically not called directly.
    * Use `BaseTransformer.paginate()` instead.
    *
-   * @param collection - The collection of data to paginate
-   * @param metaData - Pagination metadata (page, perPage, total, etc.)
+   * @param collection The collection of data to paginate
+   * @param metaData Pagination metadata (page, perPage, total, etc.)
    */
   constructor(
     public collection: PaginatorCollection,
@@ -54,8 +54,9 @@ export class Paginator<
    * Updates the pagination metadata with new values. Returns a new Paginator instance
    * with the updated metadata.
    *
-   * @param metaData - New metadata object or a function that receives current metadata and returns new metadata
+   * @param metaData New metadata object or a function that receives current metadata and returns new metadata
    *
+   * @example
    * ```ts
    * const paginator = UserTransformer.paginate(users, { page: 1, total: 100 })
    *
@@ -76,21 +77,21 @@ export class Paginator<
   }
 
   /**
-   * Serializes the paginated data by combining the serialized collection
+   * Resolves the paginated data by combining the serialized collection
    * with pagination metadata. This method is typically called internally by
-   * the `serialize()` function.
+   * the serializer function.
    *
    * @param container - Container resolver for dependency injection
    * @param depth - Current depth level in the transformation tree
    * @param maxDepth - Optional maximum depth override
    */
-  async serialize(
+  async resolve(
     container: ContainerResolver<any>,
     depth: number,
     maxDepth?: number
   ): Promise<UnpackAsTopLevelPaginator<this>> {
     return {
-      data: await this.collection.serialize(container, depth, maxDepth),
+      data: await this.collection.resolve(container, depth, maxDepth),
       meta: this.metaData,
     } as unknown as Promise<UnpackAsTopLevelPaginator<this>>
   }

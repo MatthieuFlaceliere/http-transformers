@@ -10,7 +10,7 @@
 import type { ContainerResolver } from '@adonisjs/fold'
 import type { RuntimeException } from '@poppinss/exception'
 
-import { transformAndSerialize } from '../utils.ts'
+import { transformAndResolve } from '../utils.ts'
 import type { ExtractTransformerVariants, Next, UnpackAsTopLevelItem } from '../types.ts'
 
 /**
@@ -132,21 +132,21 @@ export class Item<
   }
 
   /**
-   * Serializes the item by transforming it and resolving nested relationships.
-   * This method is typically called internally by the `serialize()` function.
+   * Resolve the item by transforming it and resolving nested relationships.
+   * This method is typically called internally by the serializer function.
    *
-   * The serialization process:
+   * The resolution process:
    * 1. Validates that the transformer data is not undefined
    * 2. Creates a transformer instance with the data
    * 3. Calls the variant method on the transformer
    * 4. Recursively resolves nested relationships up to the specified depth
-   * 5. Returns the serialized object
+   * 5. Returns the resolved object
    *
    * @param container - AdonisJS container resolver for dependency injection
    * @param depth - Current depth level in the transformation tree
    * @param maxDepth - Optional maximum depth override. When set to -1, uses unlimited depth
    */
-  serialize(container: ContainerResolver<any>, depth: number, maxDepth?: number) {
+  resolve(container: ContainerResolver<any>, depth: number, maxDepth?: number) {
     /**
      * If its undefined after unpacking, then throw an error
      */
@@ -156,7 +156,7 @@ export class Item<
       throw this.#debuggingError
     }
 
-    return transformAndSerialize(
+    return transformAndResolve(
       container,
       new this.transformer(this.transformerData),
       this.variant,

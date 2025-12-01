@@ -74,7 +74,7 @@ export function isObject<T extends Record<string, any>>(value: unknown): value i
  * )
  * ```
  */
-export async function transformAndSerialize(
+export async function transformAndResolve(
   container: ContainerResolver<any>,
   transformer: Record<string, any>,
   variant: string,
@@ -91,7 +91,7 @@ export async function transformAndSerialize(
   if (debug.enabled) {
     debug('serializing "%s" output %O', `${transformer.constructor.name}.${variant}`, input)
   }
-  return serializeValues(container, input, depth, maxDepth)
+  return resolveValues(container, input, depth, maxDepth)
 }
 
 /**
@@ -128,7 +128,7 @@ export async function transformAndSerialize(
  * const limitedResult = await serializeValues(container, resourceData, 3, 3)
  * ```
  */
-export async function serializeValues(
+export async function resolveValues(
   container: ContainerResolver<any>,
   input: ResourceData,
   depth: number,
@@ -145,7 +145,7 @@ export async function serializeValues(
       } else {
         promises.push(
           value
-            .serialize(container, maxDepth === -1 ? depth : depth + 1, maxDepth)
+            .resolve(container, maxDepth === -1 ? depth : depth + 1, maxDepth)
             .then((result: any) => [key, result])
         )
       }

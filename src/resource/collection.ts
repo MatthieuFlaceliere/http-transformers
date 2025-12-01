@@ -10,7 +10,7 @@
 import type { ContainerResolver } from '@adonisjs/fold'
 import { type RuntimeException } from '@poppinss/exception'
 
-import { transformAndSerialize } from '../utils.ts'
+import { transformAndResolve } from '../utils.ts'
 import {
   type Next,
   type ExtractTransformerVariants,
@@ -57,11 +57,11 @@ export class Collection<
    * Creates a new Collection instance. This constructor is typically not called directly.
    * Use `BaseTransformer.transform()` instead.
    *
-   * @param transformerData - Array of data to be transformed
-   * @param transformer - Constructor for the transformer class
-   * @param maxDepth - Maximum depth for nested transformations
-   * @param variant - Variant method name to use for transformation
-   * @param debuggingError - Runtime exception for debugging purposes
+   * @param transformerData Array of data to be transformed
+   * @param transformer Constructor for the transformer class
+   * @param maxDepth Maximum depth for nested transformations
+   * @param variant Variant method name to use for transformation
+   * @param debuggingError Runtime exception for debugging purposes
    */
   constructor(
     protected transformerData: any[],
@@ -81,8 +81,9 @@ export class Collection<
    * fetched for deeply nested relationships. Relationships beyond this depth will
    * be excluded from the serialized output.
    *
-   * @param value - Maximum depth level for nested transformations (valid values: 1, 2, 3, 4, 5, or 6)
+   * @param value Maximum depth level for nested transformations (valid values: 1, 2, 3, 4, 5, or 6)
    *
+   * @example
    * ```ts
    * // Limit depth to 2 levels
    * const posts = PostTransformer.transform(userData.posts)
@@ -109,9 +110,10 @@ export class Collection<
    * of the same data (e.g., toObject, toSummary, toDetailed). This method allows you
    * to choose which variant to use for this collection.
    *
-   * @param value - Name of the transformer variant method to use (must be a method name that
-   *                 returns ResourceData or Promise<ResourceData>)
+   * @param value Name of the transformer variant method to use (must be a method name that
+   *              returns ResourceData or Promise<ResourceData>)
    *
+   * @example
    * ```ts
    * // Use default toObject variant
    * const users = UserTransformer.transform(userData)
@@ -138,23 +140,23 @@ export class Collection<
   }
 
   /**
-   * Serializes the collection by transforming each item and resolving nested relationships.
-   * This method is typically called internally by the `serialize()` function.
+   * Resolve the collection by transforming each item and resolving nested relationships.
+   * This method is typically called internally by the serializer.
    *
-   * The serialization process:
+   * The resolution process:
    * 1. Creates a transformer instance for each item in the collection
    * 2. Calls the variant method on each transformer
    * 3. Recursively resolves nested relationships up to the specified depth
-   * 4. Returns an array of serialized objects
+   * 4. Returns an array of resolved objects
    *
    * @param container - AdonisJS container resolver for dependency injection
    * @param depth - Current depth level in the transformation tree
    * @param maxDepth - Optional maximum depth override. When set to -1, uses unlimited depth
    */
-  serialize(container: ContainerResolver<any>, depth: number, maxDepth?: number) {
+  resolve(container: ContainerResolver<any>, depth: number, maxDepth?: number) {
     return Promise.all(
       this.transformerData.map((row) =>
-        transformAndSerialize(
+        transformAndResolve(
           container,
           new this.transformer(row),
           this.variant,

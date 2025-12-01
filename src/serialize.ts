@@ -12,7 +12,7 @@ import { Container, type ContainerResolver } from '@adonisjs/fold'
 
 import { Item } from './resource/item.ts'
 import { Paginator } from './paginator.ts'
-import { isObject, serializeValues } from './utils.ts'
+import { isObject, resolveValues } from './utils.ts'
 import { Collection } from './resource/collection.ts'
 import type { ResourceDataTypes, SerializeFn } from './types.ts'
 
@@ -55,11 +55,11 @@ export const serialize: SerializeFn = (
 
   const resolver = container ?? new Container().createResolver()
   if (data instanceof Item || data instanceof Collection || data instanceof Paginator) {
-    return data.serialize(resolver, 0, -1)
+    return data.resolve(resolver, 0, -1)
   }
 
   if (isObject(data)) {
-    return serializeValues(resolver, data, 0, -1)
+    return resolveValues(resolver, data, 0, -1)
   }
   return data
 }
