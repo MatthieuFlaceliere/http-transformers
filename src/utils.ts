@@ -17,16 +17,20 @@ import { Collection } from './resource/collection.ts'
 import type { JSONDataTypes, ResourceData } from './types.ts'
 
 /**
- * Checks if value is an object excluding Arrays and null values
+ * Checks if a value is a plain object, excluding arrays and null values.
  *
- * @param value - The value to check
+ * This type guard is used internally to validate transformer outputs and
+ * ensure that only plain objects are processed during serialization.
  *
- * @example
+ * @param value - The value to check for object type
+ *
  * ```ts
  * isObject({}) // true
+ * isObject({ key: 'value' }) // true
  * isObject([]) // false
  * isObject(null) // false
  * isObject("string") // false
+ * isObject(42) // false
  * ```
  */
 export function isObject<T extends Record<string, any>>(value: unknown): value is T {
@@ -34,24 +38,39 @@ export function isObject<T extends Record<string, any>>(value: unknown): value i
 }
 
 /**
- * Transforms data using a transformer instance and then serializes the result.
- * Calls the specified variant method on the transformer and validates the output.
+ * Transforms data using a transformer instance by calling the specified variant method,
+ * then serializes the result recursively. Validates that the transformer returns an object.
  *
- * @param container - Container resolver for dependency injection
- * @param transformer - The transformer instance to use
- * @param variant - The transformer method name to call
- * @param depth - Current depth level in the transformation tree
- * @param maxDepth - Optional maximum depth limit
+ * This function is used internally during the serialization process to execute transformer
+ * methods and recursively process their outputs. It ensures the transformer returns a valid
+ * object and handles nested relationships up to the specified depth.
  *
- * @example
+ * @param container - AdonisJS container resolver for dependency injection when calling transformer methods
+ * @param transformer - The transformer instance containing the variant method to execute
+ * @param variant - The transformer method name to call (e.g., 'toObject', 'toSummary')
+ * @param depth - Current depth level in the transformation tree (starts at 0)
+ * @param maxDepth - Optional maximum depth limit for nested relationships. Use -1 for unlimited depth
+ *
  * ```ts
+ * const container = app.container.createResolver()
  * const userTransformer = new UserTransformer(userData)
+ *
+ * // Transform using default toObject method at depth 0, max depth 3
  * const result = await transformAndSerialize(
  *   container,
  *   userTransformer,
  *   'toObject',
  *   0,
  *   3
+ * )
+ *
+ * // Transform using custom variant
+ * const summary = await transformAndSerialize(
+ *   container,
+ *   userTransformer,
+ *   'toSummary',
+ *   1,
+ *   2
  * )
  * ```
  */
@@ -76,22 +95,37 @@ export async function transformAndSerialize(
 }
 
 /**
- * Recursively serializes values from a resource data object, handling nested
- * Items and Collections appropriately
+ * Recursively serializes values from a resource data object by resolving nested
+ * Items, Collections, and Paginators up to the specified depth.
  *
- * @param container - Container resolver for dependency injection
- * @param input - The resource data object containing values to serialize
- * @param depth - Current depth level in the transformation tree
- * @param maxDepth - Optional maximum depth limit
+ * This function processes a resource data object and:
+ * - Resolves nested Item, Collection, and Paginator instances by calling their serialize methods
+ * - Respects depth limits to prevent infinite recursion in circular relationships
+ * - Processes values in parallel for optimal performance
+ * - Passes through primitive values and plain objects unchanged
  *
- * @example
+ * @param container - AdonisJS container resolver for dependency injection
+ * @param input - The resource data object containing values to serialize (keys to ResourceDataTypes)
+ * @param depth - Current depth level in the transformation tree (starts at 0)
+ * @param maxDepth - Optional maximum depth limit to prevent deep recursion. Use -1 for unlimited depth,
+ *                    or specify a number (e.g., 3) to limit nesting. When depth reaches maxDepth,
+ *                    nested resources are skipped
+ *
  * ```ts
+ * const container = app.container.createResolver()
+ *
+ * // Serialize resource data with nested transformers
  * const resourceData = {
  *   id: 1,
- *   user: UserTransformer.item(userData),
- *   posts: PostTransformer.collection(postsData)
+ *   name: 'John',
+ *   user: UserTransformer.transform(userData),
+ *   posts: PostTransformer.transform(postsData)
  * }
  * const result = await serializeValues(container, resourceData, 0, 2)
+ * // Result: { id: 1, name: 'John', user: {...}, posts: [...] }
+ *
+ * // With depth limit reached, nested resources are excluded
+ * const limitedResult = await serializeValues(container, resourceData, 3, 3)
  * ```
  */
 export async function serializeValues(
@@ -116,7 +150,7 @@ export async function serializeValues(
         )
       }
     } else {
-      output[key] = value
+      output[key] = value as JSONDataTypes
     }
   }
 

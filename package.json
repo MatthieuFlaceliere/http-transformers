@@ -8,6 +8,7 @@
   "type": "module",
   "files": [
     "build",
+    "!build/benchmarks",
     "!build/bin",
     "!build/tests"
   ],
@@ -36,6 +37,7 @@
     "@adonisjs/fold": "^11.0.0-next.2",
     "@adonisjs/prettier-config": "^1.4.5",
     "@adonisjs/tsconfig": "^2.0.0-next.0",
+    "@ark/attest": "^0.55.0",
     "@japa/assert": "^4.1.1",
     "@japa/expect": "^3.0.6",
     "@japa/expect-type": "^2.0.3",

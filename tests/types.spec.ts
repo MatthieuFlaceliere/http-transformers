@@ -10,7 +10,6 @@
 import { test } from '@japa/runner'
 import { debug } from '../src/debug.ts'
 import { serialize } from '../src/serialize.ts'
-import { type InferVariants, type InferData } from '../src/types.ts'
 import { User } from './fixtures/models/user.ts'
 import { Post } from './fixtures/models/posts.ts'
 import { Email } from './fixtures/models/email.ts'
@@ -20,6 +19,13 @@ import { PostTransformer } from './fixtures/transformers/post.ts'
 import { UserTransformer } from './fixtures/transformers/user.ts'
 import { EmailTransformer } from './fixtures/transformers/email.ts'
 import { ProfileTransformer } from './fixtures/transformers/profile.ts'
+import { type InferVariants, type InferData, type ResourceData } from '../src/types.ts'
+
+declare module '../src/types.ts' {
+  interface ExtendJSONTypes {
+    bigInt: BigInt
+  }
+}
 
 test.group('Types', () => {
   test('infer nested objects and arrays', async ({ expectTypeOf }) => {
@@ -169,6 +175,64 @@ test.group('Types', () => {
     }>()
     expectTypeOf(exampleDataObject).toEqualTypeOf<ExampleData>()
   })
+
+  test('disallow paginated relationships', async () => {
+    class UserLocalTransformer extends BaseTransformer<{ id: number }> {
+      toObject() {
+        return this.resource
+      }
+    }
+
+    class ExampleTransformer extends BaseTransformer<{}> {
+      hasProfile: boolean = true
+      toObject() {
+        return {
+          id: 1,
+          // @ts-expect-error
+          user: UserLocalTransformer.paginate([{ id: 1 }], {}),
+        } satisfies ResourceData
+      }
+    }
+
+    await serialize(ExampleTransformer.transform({}))
+  })
+
+  test('disallow returning non-serializable values', async () => {
+    class ExampleTransformer extends BaseTransformer<{}> {
+      hasProfile: boolean = true
+      toObject() {
+        return {
+          id: 1,
+          // @ts-expect-error
+          scores: new Map(),
+        } satisfies ResourceData
+      }
+    }
+
+    const r = await serialize(ExampleTransformer.transform({}))
+    console.log(r)
+  })
+
+  test('allow custom values', async ({ expectTypeOf }) => {
+    class ExampleTransformer extends BaseTransformer<{}> {
+      hasProfile: boolean = true
+      toObject() {
+        return {
+          id: 1,
+          scores: BigInt(10),
+        } satisfies ResourceData
+      }
+    }
+
+    const exampleTransformer = new ExampleTransformer({})
+    const exampleDataObject = await serialize(ExampleTransformer.transform({}))
+    type ExampleData = InferData<typeof exampleTransformer>
+    expectTypeOf<ExampleData>().toEqualTypeOf<{
+      id: number
+      scores: bigint
+    }>()
+    expectTypeOf(exampleDataObject).toEqualTypeOf<ExampleData>()
+  })
 })
 
 test.group('Types | Fixtures', () => {
@@ -200,16 +264,18 @@ test.group('Types | Fixtures', () => {
                   githubUsername: string | null
                 }
               | undefined
-            posts: {
-              id: number
-              title: string
-              config: { hello: string } | boolean
-              can: {
-                create: boolean
-                edit: boolean
-                remove: boolean
-              }
-            }[]
+            posts?:
+              | {
+                  id: number
+                  title: string
+                  config: { hello: string } | boolean
+                  can: {
+                    create: boolean
+                    edit: boolean
+                    remove: boolean
+                  }
+                }[]
+              | undefined
           }
         | { isGuest: boolean }
     }>()
@@ -255,22 +321,24 @@ test.group('Types | Fixtures', () => {
             }[]
           }
         | undefined
-      posts: {
-        id: number
-        title: string
-        config: { hello: string } | boolean
-        can: {
-          create: boolean
-          edit: boolean
-          remove: boolean
-        }
-        author:
-          | {
-              id: number
-              name: string
+      posts?:
+        | {
+            id: number
+            title: string
+            config: { hello: string } | boolean
+            can: {
+              create: boolean
+              edit: boolean
+              remove: boolean
             }
-          | { isGuest: boolean }
-      }[]
+            author:
+              | {
+                  id: number
+                  name: string
+                }
+              | { isGuest: boolean }
+          }[]
+        | undefined
     }>()
     expectTypeOf(userDataObject).toEqualTypeOf<UserData>()
   })

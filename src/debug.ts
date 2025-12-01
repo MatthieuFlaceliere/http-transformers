@@ -13,7 +13,12 @@ import { debuglog } from 'node:util'
  * Debug logger instance for AdonisJS data transformation operations.
  * Uses Node.js built-in util.debuglog for conditional logging based on NODE_DEBUG environment variable.
  *
- * @example
+ * Enable debug logging by setting the NODE_DEBUG environment variable:
+ * ```
+ * NODE_DEBUG=adonisjs:data node app.js
+ * ```
+ *
+ * Usage:
  * ```ts
  * debug('Transforming user data: %o', userData)
  * debug('Collection processing started with %d items', items.length)

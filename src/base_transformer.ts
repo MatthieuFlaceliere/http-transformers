@@ -15,25 +15,23 @@ import { Paginator } from './paginator.ts'
 import { Collection } from './resource/collection.ts'
 
 /**
- * Serves as the base for creating custom data transformers.
+ * Base class for creating custom data transformers. Provides utilities for transforming
+ * data into consistent API responses with support for relationships and conditional values.
  *
- * @example
  * ```ts
- * // Creates a one-to-one relationship between two transformers
- * transformer.item(value)
- *
- * // Creates a one-to-many relationship between two transformer
- * transformer.collection(values)
- *
- * // Wraps the value inside a Maybe to allow undefined values when forming a relation
- * transformer.whenLoaded(value)
- *
- * // Lazily compute value when a conditional is true. A simpler way of writing ternary
- * transformer.when(conditon, () => computeValue())
- *
- * // Sets the value when an aggregate was computed for the relationship. Think
- * // of it as a shorthand of self reading the value from the $extras object
- * transformer.whenCounted('relationName')
+ * class UserTransformer extends BaseTransformer<User> {
+ *   toObject() {
+ *     return {
+ *       id: this.resource.id,
+ *       name: this.resource.name,
+ *       // Transform related data
+ *       profile: UserTransformer.transform(this.whenLoaded(this.resource.profile)),
+ *       posts: PostTransformer.transform(this.whenLoaded(this.resource.posts)),
+ *       // Conditional values
+ *       isAdmin: this.when(this.resource.role === 'admin', () => true, false)
+ *     }
+ *   }
+ * }
  * ```
  */
 export abstract class BaseTransformer<T> {
@@ -41,9 +39,9 @@ export abstract class BaseTransformer<T> {
    * Static method to transform data into Item or Collection instances.
    * Handles single objects, arrays, null values, and Maybe-wrapped values.
    *
-   * @param data - The data to transform (can be single object, array, null, or Maybe-wrapped)
+   * This method is overloaded to handle different input types and return appropriate
+   * Item or Collection instances based on the input.
    *
-   * @example
    * ```ts
    * class UserTransformer extends BaseTransformer<User> {
    *   toObject() {
@@ -163,11 +161,11 @@ export abstract class BaseTransformer<T> {
   }
 
   /**
-   * Create a paginated collection from an array of data
+   * Create a paginated collection from an array of data with pagination metadata.
    *
    * @param data - Array of data objects to transform into a paginated collection
+   * @param metaData - Pagination metadata (e.g., page, perPage, total, etc.)
    *
-   * @example
    * ```ts
    * class UserTransformer extends BaseTransformer<User> {
    *   toObject() {
@@ -176,27 +174,31 @@ export abstract class BaseTransformer<T> {
    * }
    *
    * // Create paginated collection
-   * const paginatedUsers = UserTransformer.paginate([user1, user2, user3])
+   * const paginatedUsers = UserTransformer.paginate(
+   *   [user1, user2, user3],
+   *   { page: 1, perPage: 10, total: 50 }
+   * )
    * ```
    */
   static paginate<Self extends { new (...args: any[]): any }, MetaData extends Record<string, any>>(
     this: Self,
     data: ConstructorParameters<Self>[0][],
     metaData: MetaData
-  ): Paginator<Collection<InstanceType<Self>, 1, 'toObject'>, 'data', MetaData> {
+  ): Paginator<Collection<InstanceType<Self>, 1, 'toObject'>, MetaData> {
     return new Paginator(
       new Collection(data, this, 1, 'toObject', new RuntimeException()),
-      'data',
       metaData
     )
   }
 
   /**
-   * Create a new transformer instance with the provided resource data
+   * Create a new transformer instance with the provided resource data.
+   *
+   * This constructor is typically not called directly. Instead, use the static
+   * `transform` method to create Item or Collection instances.
    *
    * @param resource - The raw resource data to be transformed
    *
-   * @example
    * ```ts
    * class UserTransformer extends BaseTransformer<User> {
    *   constructor(user: User) {
@@ -208,18 +210,17 @@ export abstract class BaseTransformer<T> {
   constructor(protected resource: T) {}
 
   /**
-   * Wrap the value into an optional to not fail when the
-   * collection or item data is undefined
+   * Wrap a value in a Maybe container to handle potentially undefined values.
+   * This is useful for relationships that may or may not be loaded.
    *
    * @param value - The value to wrap in a Maybe container
    *
-   * @example
    * ```ts
    * class UserTransformer extends BaseTransformer<User> {
    *   toObject() {
    *     return {
    *       id: this.resource.id,
-   *       profile: this.whenLoaded(this.resource.profile)
+   *       profile: ProfileTransformer.transform(this.whenLoaded(this.resource.profile))
    *     }
    *   }
    * }
@@ -230,13 +231,12 @@ export abstract class BaseTransformer<T> {
   }
 
   /**
-   * Omits the given keys from the data-set. The return value is a
-   * shallow copy of the original data-set.
+   * Omits the specified keys from a data object and returns a shallow copy
+   * without those keys.
    *
    * @param data - The source object to omit keys from
    * @param keys - Array of keys to omit from the data object
    *
-   * @example
    * ```ts
    * class UserTransformer extends BaseTransformer<User> {
    *   toObject() {
@@ -257,13 +257,12 @@ export abstract class BaseTransformer<T> {
   }
 
   /**
-   * Picks the given keys from the data-set. The return value is a
-   * shallow copy containing only the specified keys.
+   * Picks only the specified keys from a data object and returns a shallow copy
+   * containing only those keys.
    *
    * @param data - The source object to pick keys from
    * @param keys - Array of keys to pick from the data object
    *
-   * @example
    * ```ts
    * class UserTransformer extends BaseTransformer<User> {
    *   toSummary() {
@@ -284,20 +283,23 @@ export abstract class BaseTransformer<T> {
   }
 
   /**
-   * Conditionally compute a value based on a boolean condition
+   * Conditionally compute a value based on a boolean condition. This is a cleaner
+   * alternative to using ternary operators in transformers.
    *
    * @param conditional - Boolean condition to evaluate
    * @param resolver - Function that returns the value when condition is true
-   * @param fallback - Optional fallback value when condition is false
+   * @param fallback - Optional fallback value when condition is false (defaults to undefined)
    *
-   * @example
    * ```ts
    * class UserTransformer extends BaseTransformer<User> {
    *   toObject() {
    *     return {
    *       id: this.resource.id,
    *       name: this.resource.name,
-   *       isAdmin: this.when(this.resource.role === 'admin', () => true, false)
+   *       // Include role only for admins
+   *       role: this.when(this.resource.role === 'admin', () => 'admin'),
+   *       // Include with fallback
+   *       status: this.when(this.resource.isActive, () => 'active', 'inactive')
    *     }
    *   }
    * }

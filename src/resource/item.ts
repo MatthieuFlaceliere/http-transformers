@@ -11,17 +11,16 @@ import type { ContainerResolver } from '@adonisjs/fold'
 import type { RuntimeException } from '@poppinss/exception'
 
 import { transformAndSerialize } from '../utils.ts'
-import type { ExtractTransformerVariants, InferData, Next } from '../types.ts'
+import type { ExtractTransformerVariants, Next, UnpackAsTopLevelItem } from '../types.ts'
 
 /**
- * Represents a transformer created for a single source item.
- * Provides functionality to transform individual data items into a consistent format.
+ * Represents a single transformed item from source data. This class is typically
+ * created using the `BaseTransformer.transform()` method when passing a single object.
  *
  * @template Transformer - The transformer class used to transform the item
  * @template MaxDepth - Maximum depth for nested transformations
  * @template Variant - The transformer method variant to use for serialization
  *
- * @example
  * ```ts
  * class UserTransformer extends BaseTransformer<User> {
  *   toObject() {
@@ -29,8 +28,8 @@ import type { ExtractTransformerVariants, InferData, Next } from '../types.ts'
  *   }
  * }
  *
- * const item = UserTransformer.item(userData)
- * const serialized = await item.serialize(container, 0, 2)
+ * const item = UserTransformer.transform(userData)
+ * const serialized = await serialize(item)
  * ```
  */
 export class Item<
@@ -49,26 +48,14 @@ export class Item<
   $type: 'item' = 'item'
 
   /**
-   * Creates a new Item instance
+   * Creates a new Item instance. This constructor is typically not called directly.
+   * Use `BaseTransformer.transform()` instead.
    *
    * @param transformerData - The data item to be transformed
    * @param transformer - Constructor for the transformer class
    * @param maxDepth - Maximum depth for nested transformations
    * @param variant - Variant method name to use for transformation
    * @param debuggingError - Runtime exception for debugging purposes
-   * @param allowNullable - Whether null values are allowed
-   *
-   * @example
-   * ```ts
-   * const item = new Item(
-   *   userData,
-   *   UserTransformer,
-   *   1,
-   *   'toObject',
-   *   new RuntimeException(),
-   *   true
-   * )
-   * ```
    */
   constructor(
     protected transformerData: any,
@@ -81,15 +68,22 @@ export class Item<
   }
 
   /**
-   * Specify the depth of relationships to be resolved when creating
-   * the object tree.
+   * Specify the maximum depth of nested relationships to be resolved when
+   * serializing the item.
    *
-   * @param value - Maximum depth level for nested transformations
+   * This is useful to prevent infinite recursion or to limit the amount of data
+   * fetched for deeply nested relationships. Relationships beyond this depth will
+   * be excluded from the serialized output.
    *
-   * @example
+   * @param value - Maximum depth level for nested transformations (valid values: 1, 2, 3, 4, 5, or 6)
+   *
    * ```ts
-   * const user = UserTransformer.item(userData)
-   *   .depth(3) // Allow 3 levels of nested relationships
+   * // Limit depth to 3 levels
+   * const user = UserTransformer.transform(userData)
+   *   .depth(3)
+   *
+   * // This allows: user -> posts -> comments -> author (3 levels)
+   * // But excludes: user -> posts -> comments -> author -> profile (4 levels)
    * ```
    */
   depth<T extends Next[number]>(value: T): Item<Transformer, T, Variant> {
@@ -103,14 +97,26 @@ export class Item<
   }
 
   /**
-   * Specify the variant to use for the relationship
+   * Specify which transformer variant method to use for serialization.
    *
-   * @param value - Name of the transformer variant method to use
+   * Transformers can define multiple methods (variants) for different representations
+   * of the same data (e.g., toObject, toSummary, toDetailed). This method allows you
+   * to choose which variant to use for this item.
    *
-   * @example
+   * @param value - Name of the transformer variant method to use (must be a method name that
+   *                 returns ResourceData or Promise<ResourceData>)
+   *
    * ```ts
-   * const user = UserTransformer.item(userData)
-   *   .useVariant('toSummary') // Use toSummary() instead of toObject()
+   * // Use default toObject variant
+   * const user = UserTransformer.transform(userData)
+   *
+   * // Use custom toSummary variant for lighter payload
+   * const userSummary = UserTransformer.transform(userData)
+   *   .useVariant('toSummary')
+   *
+   * // Use detailed variant for admin view
+   * const detailedUser = UserTransformer.transform(userData)
+   *   .useVariant('toDetailed')
    * ```
    */
   useVariant<V extends ExtractTransformerVariants<Transformer>>(
@@ -126,17 +132,19 @@ export class Item<
   }
 
   /**
-   * Serializes the item data using the transformer
+   * Serializes the item by transforming it and resolving nested relationships.
+   * This method is typically called internally by the `serialize()` function.
    *
-   * @param container - Container resolver for dependency injection
+   * The serialization process:
+   * 1. Validates that the transformer data is not undefined
+   * 2. Creates a transformer instance with the data
+   * 3. Calls the variant method on the transformer
+   * 4. Recursively resolves nested relationships up to the specified depth
+   * 5. Returns the serialized object
+   *
+   * @param container - AdonisJS container resolver for dependency injection
    * @param depth - Current depth level in the transformation tree
-   * @param maxDepth - Optional maximum depth override
-   *
-   * @example
-   * ```ts
-   * const user = UserTransformer.item(userData)
-   * const serialized = await user.serialize(container, 0, 2)
-   * ```
+   * @param maxDepth - Optional maximum depth override. When set to -1, uses unlimited depth
    */
   serialize(container: ContainerResolver<any>, depth: number, maxDepth?: number) {
     /**
@@ -154,6 +162,6 @@ export class Item<
       this.variant,
       depth,
       maxDepth === -1 ? undefined : (maxDepth ?? this.maxDepth)
-    ) as unknown as Promise<InferData<Transformer, Variant, -1, 0>>
+    ) as unknown as Promise<UnpackAsTopLevelItem<this>>
   }
 }

@@ -1068,52 +1068,11 @@ test.group('Transformer', () => {
       currentPage: 1,
     })
     expectTypeOf(userData).toEqualTypeOf<{
-      total: number
-      currentPage: number
-      data: {
-        id: number
-        fullName: string | null
-        email: string
-      }[]
-    }>()
-  })
-
-  test('set data prop', async ({ assert, expectTypeOf }) => {
-    class User {
-      declare id: number
-      declare fullName: string | null
-      declare email: string
-    }
-    class UserTransformer extends BaseTransformer<User> {
-      toObject() {
-        return {
-          id: this.resource.id,
-          fullName: this.resource.fullName,
-          email: this.resource.email,
-        }
+      meta: {
+        total: number
+        currentPage: number
       }
-    }
-
-    const user = new User()
-    user.id = 1
-    user.fullName = null
-    user.email = 'foo@bar.com'
-
-    const userData = await serialize(
-      UserTransformer.paginate([user], {
-        total: 10,
-        currentPage: 1,
-      }).setDataProp('users')
-    )
-    assert.deepEqual(userData, {
-      users: [{ id: 1, fullName: null, email: 'foo@bar.com' }],
-      currentPage: 1,
-      total: 10,
-    })
-    expectTypeOf(userData).toEqualTypeOf<{
-      total: number
-      currentPage: number
-      users: {
+      data: {
         id: number
         fullName: string | null
         email: string
@@ -1157,9 +1116,11 @@ test.group('Transformer', () => {
       total: 10,
     })
     expectTypeOf(userData).toEqualTypeOf<{
-      total: number
-      currentPage: number
-      lastPage: number
+      meta: {
+        total: number
+        currentPage: number
+        lastPage: number
+      }
       data: {
         id: number
         fullName: string | null
@@ -1208,9 +1169,11 @@ test.group('Transformer', () => {
       total: 10,
     })
     expectTypeOf(userData).toEqualTypeOf<{
-      total: number
-      currentPage: number
-      lastPage: number
+      meta: {
+        total: number
+        currentPage: number
+        lastPage: number
+      }
       data: {
         id: number
         fullName: string | null

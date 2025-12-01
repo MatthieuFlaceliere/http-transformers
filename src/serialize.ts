@@ -20,22 +20,29 @@ import type { ResourceDataTypes, SerializeFn } from './types.ts'
  * Main serialization function that converts transformer data into plain JavaScript objects.
  * Handles Items, Collections, Paginators, and plain resource data objects.
  *
- * @param data - The data to serialize (can be Item, Collection, Paginator, or resource data)
- * @param container - Optional container resolver for dependency injection
+ * This function recursively processes the data structure, resolving all transformers
+ * and nested relationships to produce a plain JavaScript object suitable for JSON serialization.
  *
- * @example
+ * @param data - The data to serialize (can be Item, Collection, Paginator, or resource data)
+ * @param container - Optional AdonisJS container resolver for dependency injection. If not provided,
+ *                     a new container will be created automatically
+ *
  * ```ts
  * // Serialize a single item
- * const userItem = UserTransformer.item(userData)
+ * const userItem = UserTransformer.transform(userData)
  * const serializedUser = await serialize(userItem)
  *
  * // Serialize a collection
- * const usersCollection = UserTransformer.collection(usersData)
+ * const usersCollection = UserTransformer.transform(usersArray)
  * const serializedUsers = await serialize(usersCollection)
  *
- * // Serialize resource data
- * const resourceData = { id: 1, name: "John" }
- * const serialized = await serialize(resourceData)
+ * // Serialize a paginator
+ * const paginated = UserTransformer.paginate(usersArray, { page: 1, perPage: 10 })
+ * const serializedPaginated = await serialize(paginated)
+ *
+ * // Serialize with custom container
+ * const container = app.container.createResolver()
+ * const serialized = await serialize(userItem, container)
  * ```
  */
 export const serialize: SerializeFn = (

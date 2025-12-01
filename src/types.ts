@@ -7,21 +7,15 @@
  * file that was distributed with this source code.
  */
 
-import { type Jsonify } from 'type-fest'
-import { type Prettify } from '@poppinss/types'
 import { type ContainerResolver } from '@adonisjs/fold'
-
-import { type Paginator } from './paginator.ts'
+import { type Prettify, type ExtractUndefined, type ExtractDefined } from '@poppinss/types'
 import { type BaseTransformer } from './base_transformer.ts'
-// import { type Collection } from './resource/collection.ts'
-// import { type Item } from './resource/item.ts'
 
 /**
  * Counter to increment the depth. At max we will allow fetching
- * resources upto 6 levels deep. Beyond that is madness for any
- * sort of application
+ * resources up to 6 levels deep. Beyond that is madness for any
+ * sort of application.
  *
- * @example
  * ```typescript
  * type DepthCounter = Next[0] // 1
  * type NextDepth = Next[1]    // 2
@@ -29,12 +23,15 @@ import { type BaseTransformer } from './base_transformer.ts'
  */
 export type Next = [1, 2, 3, 4, 5, 6]
 
+/**
+ * Represents primitive types that can be safely serialized to JSON.
+ */
 export type JSONPrimitives = string | number | bigint | boolean | null | undefined
 
 /**
- * Values that are JSON.stringify friendly
+ * Values that are JSON.stringify friendly, including primitives and objects
+ * that can be serialized via a toJSON method.
  *
- * @example
  * ```typescript
  * const validValues: JSONValues[] = [
  *   "string",
@@ -48,14 +45,13 @@ export type JSONPrimitives = string | number | bigint | boolean | null | undefin
  * ]
  * ```
  */
-export type JSONValues = JSONPrimitives | Date | CanBeSerialized<any>
+export type JSONValues = JSONPrimitives | CanBeSerialized<any>
 
 /**
- * Representation of a value object that can be serialized to JSON
+ * Representation of a value object that can be serialized to JSON via a toJSON method.
  *
  * @template T - The type that the toJSON method should return
  *
- * @example
  * ```typescript
  * class User implements CanBeSerialized<{ id: number; name: string }> {
  *   constructor(private id: number, private name: string) {}
@@ -74,9 +70,8 @@ export type CanBeSerialized<T extends JSONDataTypes> = {
 }
 
 /**
- * Recursive JSON.stringify friendly values that can include arrays and nested objects
+ * Recursive JSON.stringify friendly values that can include arrays and nested objects.
  *
- * @example
  * ```typescript
  * const simpleData: JSONDataTypes = "hello"
  * const arrayData: JSONDataTypes = [1, 2, 3]
@@ -89,38 +84,45 @@ export type CanBeSerialized<T extends JSONDataTypes> = {
  */
 export type JSONDataTypes = JSONValues | JSONDataTypes[] | { [key: string]: JSONDataTypes }
 
-export type GetOptional<T> = {
-  [K in keyof T]: [undefined] extends [T[K]] ? K : never
-}[keyof T]
-export type GetRequired<T> = {
-  [K in keyof T]: [undefined] extends [T[K]] ? never : K
-}[keyof T]
-
+/**
+ * Helper type to serialize object types while preserving required and optional properties.
+ */
 export type SerializeJSONObject<T> = {
-  [K in keyof T]: SerializeJSONTypes<T[K]>
-}
-
-type JsonifyList<T extends unknown[]> = T extends readonly []
-  ? []
-  : Array<SerializeJSONTypes<T[number]>>
-
-export type UndefinedToOptional<T> = {
-  [Key in GetRequired<T>]: T[Key]
+  [K in ExtractDefined<T>]: SerializeJSONTypes<T[K]>
 } & {
-  [Key in GetOptional<T>]?: T[Key]
+  [K in ExtractUndefined<T>]?: SerializeJSONTypes<T[K]>
 }
 
+export interface ExtendJSONTypes {}
+export type NonAllowedJSTypes = Map<any, any> | Set<any>
+export type ForcefullyAllowedTypes = {
+  [K in keyof ExtendJSONTypes]: ExtendJSONTypes[K]
+}[keyof ExtendJSONTypes]
+
+/**
+ * Helper type to recursively serialize types, handling primitives, arrays, and objects.
+ */
 export type SerializeJSONOwnTypes<T> = T extends JSONPrimitives
   ? T
-  : T extends Date
-    ? string
-    : T extends Array<infer item>
-      ? Array<SerializeJSONTypes<item>>
-      : Prettify<SerializeJSONObject<UndefinedToOptional<T>>>
+  : T extends ForcefullyAllowedTypes
+    ? T
+    : T extends NonAllowedJSTypes
+      ? never
+      : T extends Array<infer item>
+        ? Array<SerializeJSONTypes<item>>
+        : T extends object
+          ? Prettify<SerializeJSONObject<T>>
+          : never
 
+/**
+ * Main serialization type that handles objects with toJSON methods.
+ */
 export type SerializeJSONTypes<T> =
   T extends CanBeSerialized<infer A> ? SerializeJSONOwnTypes<A> : SerializeJSONOwnTypes<T>
 
+/**
+ * Contract interface for Item instances used in type inference.
+ */
 export interface ItemContract<
   Transformer extends Record<string, any>,
   MaxDepth extends Next[number],
@@ -132,6 +134,9 @@ export interface ItemContract<
   variant: Variant
 }
 
+/**
+ * Contract interface for Collection instances used in type inference.
+ */
 export interface CollectionContract<
   Transformer extends Record<string, any>,
   MaxDepth extends Next[number],
@@ -144,6 +149,18 @@ export interface CollectionContract<
 }
 
 /**
+ * Contract interface for Paginator instances used in type inference.
+ */
+export interface PaginatorContract<
+  PaginatorCollection extends CollectionContract<any, any, any>,
+  MetaData extends Record<string, any>,
+> {
+  $type: 'paginator'
+  collection: PaginatorCollection
+  metaData: MetaData
+}
+
+/**
  * Extracts the variant methods of a transformer class. Any method that returns ResourceData
  * or Promise<ResourceData> can be picked for serialization.
  *
@@ -152,7 +169,6 @@ export interface CollectionContract<
  *
  * @template Transformer - The transformer class to extract variant methods from
  *
- * @example
  * ```typescript
  * class UserResource {
  *   toObject() { return { id: 1, name: "John" } }
@@ -172,15 +188,13 @@ export type ExtractTransformerVariants<Transformer> = {
 }[keyof Transformer & string]
 
 /**
- * Supported resource datatypes. The collections and items are supported only
+ * Supported resource data types. Collections and Items are supported only
  * at the top-level, since relationships in nested properties will lead
- * to a recursive "async" serialization which is 100x slower than
- * sync serialization.
+ * to recursive async serialization which is significantly slower.
  *
  * Never allow "ResourceDataTypes" recursively as that will make us resolve
  * collections and items recursively as well.
  *
- * @example
  * ```typescript
  * const stringData: ResourceDataTypes = "hello"
  * const collectionData: ResourceDataTypes = new Collection(users, UserResource)
@@ -191,20 +205,18 @@ export type ResourceDataTypes =
   | JSONDataTypes
   | CollectionContract<any, any, any>
   | ItemContract<any, any, any>
-  | Paginator<any, any, any>
 
 /**
- * A record of resource data types. This is something every transformer
+ * A record of resource data types. This is what every transformer
  * must return from their transformation methods.
  *
- * @example
  * ```typescript
  * class UserResource {
  *   toObject(): ResourceData {
  *     return {
  *       id: this.user.id,
  *       name: this.user.name,
- *       posts: new Collection(this.user.posts, PostResource)
+ *       posts: PostTransformer.transform(this.user.posts)
  *     }
  *   }
  * }
@@ -216,63 +228,43 @@ export type ResourceData = Record<string, ResourceDataTypes>
  * Unpacks the value of a key inside ResourceData. Collections and Items
  * are recursively processed with depth tracking.
  *
- * @template Value - The value type to unpack
- * @template MaxDepth - Maximum depth allowed for unpacking
- * @template Depth - Current depth level
+ * @internal
  */
 export type UnpackKeyValue<
   Value extends [any, any],
   MaxDepth extends number,
   Depth extends number,
-  AtTopLevel extends boolean,
 > = [Value[0]] extends [never]
   ? SerializeJSONTypes<Value[1]>
   : Value[0] extends ItemContract<infer Transformer, infer LocalMaxDepth, infer Variant>
     ?
-        | (AtTopLevel extends true
-            ? InferData<Transformer, Variant, -1, 0>
-            : InferData<
-                Transformer,
-                Variant,
-                MaxDepth extends -1 ? LocalMaxDepth : MaxDepth,
-                Next[Depth]
-              >)
+        | InferData<
+            Transformer,
+            Variant,
+            MaxDepth extends -1 ? LocalMaxDepth : MaxDepth,
+            Next[Depth]
+          >
         | SerializeJSONTypes<Value[1]>
     : Value[0] extends CollectionContract<infer Transformer, infer LocalMaxDepth, infer Variant>
       ?
-          | (AtTopLevel extends true
-              ? InferData<Transformer, Variant, -1, 0>
-              : InferData<
-                  Transformer,
-                  Variant,
-                  MaxDepth extends -1 ? LocalMaxDepth : MaxDepth,
-                  Next[Depth]
-                >)[]
+          | InferData<
+              Transformer,
+              Variant,
+              MaxDepth extends -1 ? LocalMaxDepth : MaxDepth,
+              Next[Depth]
+            >[]
           | SerializeJSONTypes<Value[1]>
       : SerializeJSONTypes<Value[1]>
-// : never
 
 /**
  * Validates the Depth property against the MaxDepth and drops the key
  * when both are the same.
  *
- * Since there is no arithmetic checks in TypeScript, we cannot check of Depth >= MaxDepth.
+ * Since there are no arithmetic checks in TypeScript, we cannot check if Depth >= MaxDepth.
  * We have to rely on Depth === MaxDepth and be careful about not incrementing the
- * depth unnecessarily as that might make the entire check fail
+ * depth unnecessarily as that might make the entire check fail.
  *
- * @template Key - The key to potentially limit
- * @template Value - The value associated with the key
- * @template MaxDepth - Maximum allowed depth
- * @template Depth - Current depth level
- *
- * @example
- * ```typescript
- * type LimitedKey = LimitDepth<"posts", Collection<Post, 2, "toObject">, 2, 2>
- * // Result: never (key is dropped because depth limit is reached)
- *
- * type AllowedKey = LimitDepth<"posts", Collection<Post, 2, "toObject">, 3, 2>
- * // Result: "posts" (key is allowed because depth limit is not reached)
- * ```
+ * @internal
  */
 export type LimitDepth<Key, Value, MaxDepth extends number, Depth extends number> = [
   Value,
@@ -286,109 +278,58 @@ export type LimitDepth<Key, Value, MaxDepth extends number, Depth extends number
       ? MaxDepth extends Depth
         ? never
         : Key
-      : [Paginator<any, any, any>] extends [Value]
-        ? MaxDepth extends Depth
-          ? never
-          : Key
-        : Key
+      : Key
 
 /**
- * Only unpacks values that can be undefined and mark them as optional.
+ * Only unpacks values that can be undefined and marks them as optional.
  *
- * @template Data - The data object to unpack optional values from
- * @template MaxDepth - Maximum depth allowed for unpacking
- * @template Depth - Current depth level
- *
- * @example
- * ```typescript
- * type OptionalFields = UnpackOptionalValues<{
- *   name: string
- *   email?: string
- *   age: number | undefined
- * }, 3, 0>
- * // Result: { email?: string; age?: number }
- * ```
+ * @internal
  */
-export type UnpackOptionalValues<
-  Data,
-  MaxDepth extends number,
-  Depth extends number,
-  AtTopLevel extends boolean,
-> = {
+export type UnpackOptionalValues<Data, MaxDepth extends number, Depth extends number> = {
   [O in {
     [K in keyof Data]: [undefined] extends [Data[K]]
       ? LimitDepth<K, SplitItm<Data[K]>[0], MaxDepth, Depth>
       : never
-  }[keyof Data]]?: UnpackKeyValue<SplitItm<Data[O]>, MaxDepth, Depth, AtTopLevel>
+  }[keyof Data]]?: UnpackKeyValue<SplitItm<Data[O]>, MaxDepth, Depth>
 }
 
 /**
  * Only unpacks defined (including null) values as required properties.
  *
- * @template Data - The data object to unpack required values from
- * @template MaxDepth - Maximum depth allowed for unpacking
- * @template Depth - Current depth level
- *
- * @example
- * ```typescript
- * type RequiredFields = UnpackRequiredValues<{
- *   name: string
- *   email?: string
- *   age: number | null
- * }, 3, 0>
- * // Result: { name: string; age: number | null }
- * ```
+ * @internal
  */
-export type UnpackRequiredValues<
-  Data,
-  MaxDepth extends number,
-  Depth extends number,
-  AtTopLevel extends boolean,
-> = {
+export type UnpackRequiredValues<Data, MaxDepth extends number, Depth extends number> = {
   [O in {
     [K in keyof Data]: [undefined] extends [Data[K]]
       ? never
       : LimitDepth<K, SplitItm<Data[K]>[0], MaxDepth, Depth>
-  }[keyof Data]]: UnpackKeyValue<SplitItm<Data[O]>, MaxDepth, Depth, AtTopLevel>
+  }[keyof Data]]: UnpackKeyValue<SplitItm<Data[O]>, MaxDepth, Depth>
 }
 
 /**
- * Unpacks an unknown value when it is an instance of "Item" class and
- * also increments the depth counter for nested resource resolution.
+ * Internal helper type to split Item/Collection types from other types.
  *
- * @template T - The Item type to unpack
- * @template MaxDepth - Maximum depth allowed for unpacking
- * @template Depth - Current depth level
+ * @internal
+ */
+export type SplitItm<T> = [
+  Extract<T, ItemContract<any, any, any> | CollectionContract<any, any, any>>,
+  Exclude<T, ItemContract<any, any, any> | CollectionContract<any, any, any>>,
+]
+
+/**
+ * Unpacks an Item instance at the top level of serialization.
  *
- * @example
- * ```typescript
- * type UnpackedItem = UnpackAsItem<Item<User, 3, "toObject", never>, 3, 0>
- * // Result: inferred data structure from User.toObject()
- * ```
+ * @internal
  */
 export type UnpackAsTopLevelItem<T> =
   T extends ItemContract<infer Transformer, any, infer Variant>
     ? InferData<Transformer, Variant, -1, 0>
     : never
 
-type SplitItm<T> = [
-  Extract<T, ItemContract<any, any, any> | CollectionContract<any, any, any>>,
-  Exclude<T, ItemContract<any, any, any> | CollectionContract<any, any, any>>,
-]
-
 /**
- * Unpacks an unknown value when it is an instance of "Collection" class and
- * also increments the depth counter for nested resource resolution.
+ * Unpacks a Collection instance at the top level of serialization.
  *
- * @template T - The Collection type to unpack
- * @template MaxDepth - Maximum depth allowed for unpacking
- * @template Depth - Current depth level
- *
- * @example
- * ```typescript
- * type UnpackedCollection = UnpackAsCollection<Collection<User[], 3, "toObject">, 3, 0>
- * // Result: Array of inferred data structures from User.toObject()
- * ```
+ * @internal
  */
 export type UnpackAsTopLevelCollection<T> =
   T extends CollectionContract<infer Transformer, any, infer Variant>
@@ -396,82 +337,76 @@ export type UnpackAsTopLevelCollection<T> =
     : never
 
 /**
- * Unpacks a Paginator type with depth tracking for nested relationships.
- * Combines the unpacked collection data with pagination metadata.
+ * Unpacks a Paginator instance at the top level of serialization.
  *
- * @template T - The Paginator type to unpack
- * @template MaxDepth - Maximum depth allowed for unpacking
- * @template Depth - Current depth level
- *
- * @example
- * ```typescript
- * type UserPaginator = Paginator<Collection<UserTransformer, 2, "toObject">, "data", { page: number }>
- * type UnpackedPaginator = UnpackAsPaginator<UserPaginator, 3, 0>
- * // Result: { data: UserData[]; page: number }
- * ```
+ * @internal
  */
-// export type UnpackAsPaginator<
-//   T,
-//   MaxDepth extends number,
-//   Depth extends number,
-//   AtTopLevel extends boolean,
-// > =
-//   T extends Paginator<infer PaginatorCollection, infer DataProp, infer MetaData>
-//     ? Prettify<
-//         {
-//           [M in DataProp]: UnpackAsCollection<PaginatorCollection, MaxDepth, Depth, AtTopLevel>
-//         } & MetaData
-//       >
-//     : T
+export type UnpackAsTopLevelPaginator<T> =
+  T extends PaginatorContract<infer Collection, infer MetaData>
+    ? {
+        data: UnpackAsTopLevelCollection<Collection>
+        meta: MetaData
+      }
+    : never
 
 /**
- * Unpack values as two sets of optional and required values, then merge them
+ * Unpacks values as two sets of optional and required values, then merges them
  * into a single prettified type.
  *
- * @template Data - The data object to unpack
- * @template MaxDepth - Maximum depth allowed for unpacking
- * @template Depth - Current depth level
- *
- * @example
- * ```typescript
- * type UnpackedData = UnpackValues<{
- *   name: string
- *   email?: string
- *   posts: Collection<Post[], 3, "toObject">
- * }, 3, 0>
- * // Result: { name: string; email?: string; posts: PostData[] }
- * ```
+ * @internal
  */
-export type UnpackValues<
-  Data,
-  MaxDepth extends number,
-  Depth extends number,
-  AtTopLevel extends boolean,
-> = UnpackRequiredValues<Data, MaxDepth, Depth, AtTopLevel> &
-  UnpackOptionalValues<Data, MaxDepth, Depth, AtTopLevel>
+export type UnpackValues<Data, MaxDepth extends number, Depth extends number> = Prettify<
+  UnpackRequiredValues<Data, MaxDepth, Depth> & UnpackOptionalValues<Data, MaxDepth, Depth>
+>
 
 /**
- * Infers the serialized data structure of a resource by extracting the return type
+ * Unpack as top-level data object
+ */
+export type UnpackTopLevelValues<Data> = Prettify<
+  {
+    [K in ExtractDefined<Data>]: Data[K] extends PaginatorContract<infer Collection, infer MetaData>
+      ? {
+          data: UnpackAsTopLevelCollection<Collection>
+          meta: MetaData
+        }
+      : UnpackKeyValue<SplitItm<Data[K]>, -1, 0>
+  } & {
+    [K in ExtractUndefined<Data>]?: Data[K] extends PaginatorContract<
+      infer Collection,
+      infer MetaData
+    >
+      ? {
+          data: UnpackAsTopLevelCollection<Collection>
+          meta: MetaData
+        }
+      : UnpackKeyValue<SplitItm<Data[K]>, -1, 0>
+  }
+>
+
+/**
+ * Infers the serialized data structure of a transformer by extracting the return type
  * of a specific variant method and unpacking it recursively.
  *
- * @template Transformer - The resource class to infer data from
+ * This is the primary type used to extract the TypeScript type of a transformer's output.
+ *
+ * @template Transformer - The transformer class to infer data from
  * @template Variant - The variant method name to use (defaults to 'toObject')
  * @template MaxDepth - Maximum depth allowed for unpacking (defaults to -1 for unlimited)
  * @template Depth - Current depth level (defaults to 0)
  *
- * @example
  * ```typescript
- * class UserResource {
+ * class UserTransformer extends BaseTransformer<User> {
  *   toObject() {
  *     return {
- *       id: this.user.id,
- *       name: this.user.name,
- *       posts: new Collection(this.user.posts, PostResource)
+ *       id: this.resource.id,
+ *       name: this.resource.name,
+ *       posts: PostTransformer.transform(this.resource.posts)
  *     }
  *   }
  * }
  *
- * type UserData = InferData<UserResource> // { id: number; name: string; posts: PostData[] }
+ * type UserData = InferData<UserTransformer>
+ * // Result: { id: number; name: string; posts: PostData[] }
  * ```
  */
 export type InferData<
@@ -480,26 +415,27 @@ export type InferData<
   MaxDepth extends number = -1,
   Depth extends number = 0,
 > = Transformer extends { [K in Variant]: (...args: any[]) => unknown }
-  ? Prettify<UnpackValues<Awaited<ReturnType<Transformer[Variant]>>, MaxDepth, Depth, false>>
+  ? UnpackValues<Awaited<ReturnType<Transformer[Variant]>>, MaxDepth, Depth>
   : never
 
 /**
  * Infers the data structure for all variant methods of a transformer class, excluding
  * the default 'toObject' method and base transformer methods.
  *
- * @template Transformer - The resource class to infer variant data from
+ * Use this type to extract types for all custom variant methods defined on a transformer.
+ *
+ * @template Transformer - The transformer class to infer variant data from
  * @template MaxDepth - Maximum depth allowed for unpacking (defaults to -1 for unlimited)
  * @template Depth - Current depth level (defaults to 0)
  *
- * @example
  * ```typescript
- * class UserResource {
+ * class UserTransformer extends BaseTransformer<User> {
  *   toObject() { return { id: 1, name: "John" } }
  *   toSummary() { return { id: 1 } }
  *   toProfile() { return { id: 1, name: "John", email: "john@example.com" } }
  * }
  *
- * type UserVariants = InferVariants<UserResource>
+ * type UserVariants = InferVariants<UserTransformer>
  * // Result: {
  * //   toSummary: { id: number }
  * //   toProfile: { id: number; name: string; email: string }
@@ -523,7 +459,6 @@ export type InferVariants<Transformer, MaxDepth extends number = -1, Depth exten
  * Function interface for the main serialize function that handles different data types.
  * Provides overloads for serializing Items, Collections, Paginators, and resource data.
  *
- * @example
  * ```typescript
  * const serialize: SerializeFn = (data, container) => {
  *   // Implementation handles different data types
@@ -531,26 +466,28 @@ export type InferVariants<Transformer, MaxDepth extends number = -1, Depth exten
  * }
  *
  * // Usage examples:
- * const userItem = UserTransformer.item(userData)
+ * const userItem = UserTransformer.transform(userData)
  * const serializedUser = await serialize(userItem)
  *
- * const usersCollection = UserTransformer.collection(usersData)
+ * const usersCollection = UserTransformer.transform(usersData)
  * const serializedUsers = await serialize(usersCollection)
  * ```
  */
 export type SerializeFn = {
   /**
-   * Serializes a record of resource data types into plain JavaScript objects.
+   * Serializes a record of resource data types into plain JavaScript objects. The
+   * top-level object passed to the serialize function could contain paginator
+   * objects as well.
    *
    * @template Data - Record type containing resource data
    * @param data - The resource data record to serialize
    * @param container - Optional container resolver for dependency injection
    * @returns Promise resolving to unpacked and serialized data
    */
-  <Data extends Record<string, ResourceDataTypes>>(
+  <Data extends Record<string, ResourceDataTypes | PaginatorContract<any, any>>>(
     data: Data,
     container?: ContainerResolver<any>
-  ): Promise<UnpackValues<Data, -1, 0, true>>
+  ): Promise<UnpackTopLevelValues<Data>>
 
   /**
    * Serializes an Item resource into its plain JavaScript representation.
@@ -586,10 +523,10 @@ export type SerializeFn = {
    * @param container - Optional container resolver for dependency injection
    * @returns Promise resolving to paginated data with metadata
    */
-  // <ResourcePaginator extends Paginator<any, any, any>>(
-  //   paginator: ResourcePaginator,
-  //   container?: ContainerResolver<any>
-  // ): Promise<UnpackAsPaginator<ResourcePaginator, -1, 0, true>>
+  <ResourcePaginator extends PaginatorContract<any, any>>(
+    paginator: ResourcePaginator,
+    container?: ContainerResolver<any>
+  ): Promise<UnpackAsTopLevelPaginator<ResourcePaginator>>
 
   /**
    * Serializes any other value by returning it as-is wrapped in a Promise.

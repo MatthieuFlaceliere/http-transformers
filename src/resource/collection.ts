@@ -11,17 +11,21 @@ import type { ContainerResolver } from '@adonisjs/fold'
 import { type RuntimeException } from '@poppinss/exception'
 
 import { transformAndSerialize } from '../utils.ts'
-import { type Next, type ExtractTransformerVariants, type InferData } from '../types.ts'
+import {
+  type Next,
+  type ExtractTransformerVariants,
+  type UnpackAsTopLevelCollection,
+} from '../types.ts'
 
 /**
- * Represents a collection of transformers created for an array of source data.
- * Provides functionality to transform multiple data items into a consistent format.
+ * Represents a collection of transformed items from an array of source data.
+ * This class is typically created using the `BaseTransformer.transform()` method
+ * when passing an array.
  *
  * @template Transformer - The transformer class used to transform individual items
  * @template MaxDepth - Maximum depth for nested transformations
  * @template Variant - The transformer method variant to use for serialization
  *
- * @example
  * ```ts
  * class UserTransformer extends BaseTransformer<User> {
  *   toObject() {
@@ -30,8 +34,8 @@ import { type Next, type ExtractTransformerVariants, type InferData } from '../t
  * }
  *
  * const users = [user1, user2, user3]
- * const collection = UserTransformer.collection(users)
- * const serialized = await collection.serialize(container, 0, 2)
+ * const collection = UserTransformer.transform(users)
+ * const serialized = await serialize(collection)
  * ```
  */
 export class Collection<
@@ -50,24 +54,14 @@ export class Collection<
   $type: 'collection' = 'collection'
 
   /**
-   * Creates a new Collection instance
+   * Creates a new Collection instance. This constructor is typically not called directly.
+   * Use `BaseTransformer.transform()` instead.
    *
    * @param transformerData - Array of data to be transformed
    * @param transformer - Constructor for the transformer class
    * @param maxDepth - Maximum depth for nested transformations
    * @param variant - Variant method name to use for transformation
    * @param debuggingError - Runtime exception for debugging purposes
-   *
-   * @example
-   * ```ts
-   * const collection = new Collection(
-   *   [user1, user2],
-   *   UserTransformer,
-   *   1,
-   *   'toObject',
-   *   new RuntimeException()
-   * )
-   * ```
    */
   constructor(
     protected transformerData: any[],
@@ -80,15 +74,22 @@ export class Collection<
   }
 
   /**
-   * Specify the depth of relationships to be resolved when creating
-   * the object tree.
+   * Specify the maximum depth of nested relationships to be resolved when
+   * serializing the collection.
    *
-   * @param value - Maximum depth level for nested transformations
+   * This is useful to prevent infinite recursion or to limit the amount of data
+   * fetched for deeply nested relationships. Relationships beyond this depth will
+   * be excluded from the serialized output.
    *
-   * @example
+   * @param value - Maximum depth level for nested transformations (valid values: 1, 2, 3, 4, 5, or 6)
+   *
    * ```ts
-   * const posts = PostTransformer.collection(userData.posts)
-   *   .depth(2) // Allow 2 levels of nested relationships
+   * // Limit depth to 2 levels
+   * const posts = PostTransformer.transform(userData.posts)
+   *   .depth(2)
+   *
+   * // This allows: posts -> comments -> author (2 levels)
+   * // But excludes: posts -> comments -> author -> profile (3 levels)
    * ```
    */
   depth<T extends Next[number]>(value: T): Collection<Transformer, T, Variant> {
@@ -102,14 +103,26 @@ export class Collection<
   }
 
   /**
-   * Specify the variant to use for the relationship
+   * Specify which transformer variant method to use for serialization.
    *
-   * @param value - Name of the transformer variant method to use
+   * Transformers can define multiple methods (variants) for different representations
+   * of the same data (e.g., toObject, toSummary, toDetailed). This method allows you
+   * to choose which variant to use for this collection.
    *
-   * @example
+   * @param value - Name of the transformer variant method to use (must be a method name that
+   *                 returns ResourceData or Promise<ResourceData>)
+   *
    * ```ts
-   * const users = UserTransformer.collection(userData)
-   *   .useVariant('toSummary') // Use toSummary() instead of toObject()
+   * // Use default toObject variant
+   * const users = UserTransformer.transform(userData)
+   *
+   * // Use custom toSummary variant for lighter payload
+   * const userSummaries = UserTransformer.transform(userData)
+   *   .useVariant('toSummary')
+   *
+   * // Use detailed variant for admin view
+   * const detailedUsers = UserTransformer.transform(userData)
+   *   .useVariant('toDetailed')
    * ```
    */
   useVariant<V extends ExtractTransformerVariants<Transformer>>(
@@ -125,17 +138,18 @@ export class Collection<
   }
 
   /**
-   * Serializes the collection data using the transformer
+   * Serializes the collection by transforming each item and resolving nested relationships.
+   * This method is typically called internally by the `serialize()` function.
    *
-   * @param container - Container resolver for dependency injection
+   * The serialization process:
+   * 1. Creates a transformer instance for each item in the collection
+   * 2. Calls the variant method on each transformer
+   * 3. Recursively resolves nested relationships up to the specified depth
+   * 4. Returns an array of serialized objects
+   *
+   * @param container - AdonisJS container resolver for dependency injection
    * @param depth - Current depth level in the transformation tree
-   * @param maxDepth - Optional maximum depth override
-   *
-   * @example
-   * ```ts
-   * const posts = PostTransformer.collection(userData.posts)
-   * const serialized = await posts.serialize(container, 0, 2)
-   * ```
+   * @param maxDepth - Optional maximum depth override. When set to -1, uses unlimited depth
    */
   serialize(container: ContainerResolver<any>, depth: number, maxDepth?: number) {
     return Promise.all(
@@ -148,6 +162,6 @@ export class Collection<
           maxDepth === -1 ? undefined : (maxDepth ?? this.maxDepth)
         )
       )
-    ) as unknown as Promise<InferData<Transformer, Variant, -1, 0>[]>
+    ) as unknown as Promise<UnpackAsTopLevelCollection<this>>
   }
 }

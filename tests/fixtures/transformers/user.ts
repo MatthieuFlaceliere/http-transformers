@@ -17,7 +17,7 @@ export class UserTransformer extends BaseTransformer<User> {
     return {
       ...this.omit(this.basicInfo(), ['profile']),
       profile: ProfileTransformer.transform(this.whenLoaded(this.resource.profile))?.depth(2),
-      posts: PostTransformer.transform(this.resource.posts).depth(2),
+      posts: PostTransformer.transform(this.whenLoaded(this.resource.posts))?.depth(2),
     } satisfies ResourceData
   }
 }

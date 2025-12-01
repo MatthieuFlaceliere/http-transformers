@@ -9,9 +9,11 @@
 
 /**
  * A wrapper class that allows optional values to be passed to transformers
- * without causing errors when the value is undefined
+ * without causing errors when the value is undefined.
  *
- * @example
+ * The Maybe wrapper is typically used with the `whenLoaded` method to handle
+ * relationships that may or may not be loaded.
+ *
  * ```ts
  * class UserTransformer extends BaseTransformer<User> {
  *   toObject() {
@@ -29,7 +31,6 @@ export class Maybe<T> {
    *
    * @param value - The value to wrap, which may be undefined
    *
-   * @example
    * ```ts
    * const maybeUser = new Maybe(userData)
    * const maybeUndefined = new Maybe(undefined)
