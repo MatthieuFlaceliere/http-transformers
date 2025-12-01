@@ -3,6 +3,7 @@
   "compilerOptions": {
     "rootDir": "./",
     "outDir": "./build",
+    "moduleResolution": "nodenext",
     "emitDecoratorMetadata": true
   }
 }

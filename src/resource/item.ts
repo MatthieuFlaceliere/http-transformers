@@ -11,7 +11,7 @@ import type { ContainerResolver } from '@adonisjs/fold'
 import type { RuntimeException } from '@poppinss/exception'
 
 import { transformAndSerialize } from '../utils.ts'
-import type { ExtractTransformerVariants, Next, UnpackAsItem } from '../types.ts'
+import type { ExtractTransformerVariants, InferData, Next } from '../types.ts'
 
 /**
  * Represents a transformer created for a single source item.
@@ -154,6 +154,6 @@ export class Item<
       this.variant,
       depth,
       maxDepth === -1 ? undefined : (maxDepth ?? this.maxDepth)
-    ) as unknown as Promise<UnpackAsItem<Item<Transformer, MaxDepth, Variant>, -1, 0, true>>
+    ) as unknown as Promise<InferData<Transformer, Variant, -1, 0>>
   }
 }

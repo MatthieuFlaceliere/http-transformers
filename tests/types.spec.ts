@@ -10,6 +10,7 @@
 import { test } from '@japa/runner'
 import { debug } from '../src/debug.ts'
 import { serialize } from '../src/serialize.ts'
+import { type InferVariants, type InferData } from '../src/types.ts'
 import { User } from './fixtures/models/user.ts'
 import { Post } from './fixtures/models/posts.ts'
 import { Email } from './fixtures/models/email.ts'
@@ -18,7 +19,6 @@ import { BaseTransformer } from '../src/base_transformer.ts'
 import { PostTransformer } from './fixtures/transformers/post.ts'
 import { UserTransformer } from './fixtures/transformers/user.ts'
 import { EmailTransformer } from './fixtures/transformers/email.ts'
-import { type InferVariants, type InferData } from '../src/types.ts'
 import { ProfileTransformer } from './fixtures/transformers/profile.ts'
 
 test.group('Types', () => {

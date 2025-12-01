@@ -13,8 +13,8 @@ import { type ContainerResolver } from '@adonisjs/fold'
 
 import { type Paginator } from './paginator.ts'
 import { type BaseTransformer } from './base_transformer.ts'
-import { type Collection } from './resource/collection.ts'
-import { type Item } from './resource/item.ts'
+// import { type Collection } from './resource/collection.ts'
+// import { type Item } from './resource/item.ts'
 
 /**
  * Counter to increment the depth. At max we will allow fetching
@@ -97,29 +97,51 @@ export type GetRequired<T> = {
 }[keyof T]
 
 export type SerializeJSONObject<T> = {
-  [K in keyof T]: T[K]
+  [K in keyof T]: SerializeJSONTypes<T[K]>
 }
 
 type JsonifyList<T extends unknown[]> = T extends readonly []
   ? []
   : Array<SerializeJSONTypes<T[number]>>
 
-export type UndefinedToOptional<T extends object> = {
+export type UndefinedToOptional<T> = {
   [Key in GetRequired<T>]: T[Key]
 } & {
   [Key in GetOptional<T>]?: T[Key]
 }
 
+export type SerializeJSONOwnTypes<T> = T extends JSONPrimitives
+  ? T
+  : T extends Date
+    ? string
+    : T extends Array<infer item>
+      ? Array<SerializeJSONTypes<item>>
+      : Prettify<SerializeJSONObject<UndefinedToOptional<T>>>
+
 export type SerializeJSONTypes<T> =
-  T extends CanBeSerialized<infer A>
-    ? SerializeJSONTypes<A>
-    : T extends JSONPrimitives
-      ? T
-      : T extends unknown[]
-        ? JsonifyList<T>
-        : T extends object
-          ? Prettify<SerializeJSONObject<UndefinedToOptional<T>>>
-          : string
+  T extends CanBeSerialized<infer A> ? SerializeJSONOwnTypes<A> : SerializeJSONOwnTypes<T>
+
+export interface ItemContract<
+  Transformer extends Record<string, any>,
+  MaxDepth extends Next[number],
+  Variant extends string,
+> {
+  $type: 'item'
+  transformer: { new (...args: any[]): Transformer }
+  maxDepth: MaxDepth
+  variant: Variant
+}
+
+export interface CollectionContract<
+  Transformer extends Record<string, any>,
+  MaxDepth extends Next[number],
+  Variant extends string,
+> {
+  $type: 'collection'
+  transformer: { new (...args: any[]): Transformer }
+  maxDepth: MaxDepth
+  variant: Variant
+}
 
 /**
  * Extracts the variant methods of a transformer class. Any method that returns ResourceData
@@ -167,8 +189,8 @@ export type ExtractTransformerVariants<Transformer> = {
  */
 export type ResourceDataTypes =
   | JSONDataTypes
-  | Collection<any, any, any>
-  | Item<any, any, any>
+  | CollectionContract<any, any, any>
+  | ItemContract<any, any, any>
   | Paginator<any, any, any>
 
 /**
@@ -199,17 +221,36 @@ export type ResourceData = Record<string, ResourceDataTypes>
  * @template Depth - Current depth level
  */
 export type UnpackKeyValue<
-  Value,
+  Value extends [any, any],
   MaxDepth extends number,
   Depth extends number,
   AtTopLevel extends boolean,
-> = [Item<any, any, any>] extends [Value]
-  ? UnpackAsItem<Value, MaxDepth, Depth, AtTopLevel>
-  : [Collection<any, any, any>] extends [Value]
-    ? UnpackAsCollection<Value, MaxDepth, Depth, AtTopLevel>
-    : [Paginator<any, any, any>] extends [Value]
-      ? UnpackAsPaginator<Value, MaxDepth, Depth, AtTopLevel>
-      : Jsonify<Value>
+> = [Value[0]] extends [never]
+  ? SerializeJSONTypes<Value[1]>
+  : Value[0] extends ItemContract<infer Transformer, infer LocalMaxDepth, infer Variant>
+    ?
+        | (AtTopLevel extends true
+            ? InferData<Transformer, Variant, -1, 0>
+            : InferData<
+                Transformer,
+                Variant,
+                MaxDepth extends -1 ? LocalMaxDepth : MaxDepth,
+                Next[Depth]
+              >)
+        | SerializeJSONTypes<Value[1]>
+    : Value[0] extends CollectionContract<infer Transformer, infer LocalMaxDepth, infer Variant>
+      ?
+          | (AtTopLevel extends true
+              ? InferData<Transformer, Variant, -1, 0>
+              : InferData<
+                  Transformer,
+                  Variant,
+                  MaxDepth extends -1 ? LocalMaxDepth : MaxDepth,
+                  Next[Depth]
+                >)[]
+          | SerializeJSONTypes<Value[1]>
+      : SerializeJSONTypes<Value[1]>
+// : never
 
 /**
  * Validates the Depth property against the MaxDepth and drops the key
@@ -234,20 +275,22 @@ export type UnpackKeyValue<
  * ```
  */
 export type LimitDepth<Key, Value, MaxDepth extends number, Depth extends number> = [
-  Item<any, any, any>,
-] extends [Value]
-  ? MaxDepth extends Depth
-    ? never
-    : Key
-  : [Collection<any, any, any>] extends [Value]
+  Value,
+] extends [never]
+  ? Key
+  : Value extends ItemContract<any, any, any>
     ? MaxDepth extends Depth
       ? never
       : Key
-    : [Paginator<any, any, any>] extends [Value]
+    : Value extends CollectionContract<any, any, any>
       ? MaxDepth extends Depth
         ? never
         : Key
-      : Key
+      : [Paginator<any, any, any>] extends [Value]
+        ? MaxDepth extends Depth
+          ? never
+          : Key
+        : Key
 
 /**
  * Only unpacks values that can be undefined and mark them as optional.
@@ -274,9 +317,9 @@ export type UnpackOptionalValues<
 > = {
   [O in {
     [K in keyof Data]: [undefined] extends [Data[K]]
-      ? LimitDepth<K, Data[K], MaxDepth, Depth>
+      ? LimitDepth<K, SplitItm<Data[K]>[0], MaxDepth, Depth>
       : never
-  }[keyof Data]]?: UnpackKeyValue<Data[O], MaxDepth, Depth, AtTopLevel>
+  }[keyof Data]]?: UnpackKeyValue<SplitItm<Data[O]>, MaxDepth, Depth, AtTopLevel>
 }
 
 /**
@@ -305,8 +348,8 @@ export type UnpackRequiredValues<
   [O in {
     [K in keyof Data]: [undefined] extends [Data[K]]
       ? never
-      : LimitDepth<K, Data[K], MaxDepth, Depth>
-  }[keyof Data]]: UnpackKeyValue<Data[O], MaxDepth, Depth, AtTopLevel>
+      : LimitDepth<K, SplitItm<Data[K]>[0], MaxDepth, Depth>
+  }[keyof Data]]: UnpackKeyValue<SplitItm<Data[O]>, MaxDepth, Depth, AtTopLevel>
 }
 
 /**
@@ -323,18 +366,15 @@ export type UnpackRequiredValues<
  * // Result: inferred data structure from User.toObject()
  * ```
  */
-export type UnpackAsItem<
-  T,
-  MaxDepth extends number,
-  Depth extends number,
-  AtTopLevel extends boolean,
-> = AtTopLevel extends true
-  ? T extends Item<infer Transformer, any, infer Variant>
+export type UnpackAsTopLevelItem<T> =
+  T extends ItemContract<infer Transformer, any, infer Variant>
     ? InferData<Transformer, Variant, -1, 0>
-    : T
-  : T extends Item<infer Transformer, infer LocalMaxDepth, infer Variant>
-    ? InferData<Transformer, Variant, MaxDepth extends -1 ? LocalMaxDepth : MaxDepth, Next[Depth]>
-    : T
+    : never
+
+type SplitItm<T> = [
+  Extract<T, ItemContract<any, any, any> | CollectionContract<any, any, any>>,
+  Exclude<T, ItemContract<any, any, any> | CollectionContract<any, any, any>>,
+]
 
 /**
  * Unpacks an unknown value when it is an instance of "Collection" class and
@@ -350,23 +390,10 @@ export type UnpackAsItem<
  * // Result: Array of inferred data structures from User.toObject()
  * ```
  */
-export type UnpackAsCollection<
-  T,
-  MaxDepth extends number,
-  Depth extends number,
-  AtTopLevel extends boolean,
-> = AtTopLevel extends true
-  ? T extends Collection<infer Transformer, any, infer Variant>
+export type UnpackAsTopLevelCollection<T> =
+  T extends CollectionContract<infer Transformer, any, infer Variant>
     ? InferData<Transformer, Variant, -1, 0>[]
-    : T
-  : T extends Collection<infer Transformer, infer LocalMaxDepth, infer Variant>
-    ? InferData<
-        Transformer,
-        Variant,
-        MaxDepth extends -1 ? LocalMaxDepth : MaxDepth,
-        Depth extends -1 ? 0 : Next[Depth]
-      >[]
-    : T
+    : never
 
 /**
  * Unpacks a Paginator type with depth tracking for nested relationships.
@@ -383,19 +410,19 @@ export type UnpackAsCollection<
  * // Result: { data: UserData[]; page: number }
  * ```
  */
-export type UnpackAsPaginator<
-  T,
-  MaxDepth extends number,
-  Depth extends number,
-  AtTopLevel extends boolean,
-> =
-  T extends Paginator<infer PaginatorCollection, infer DataProp, infer MetaData>
-    ? Prettify<
-        {
-          [M in DataProp]: UnpackAsCollection<PaginatorCollection, MaxDepth, Depth, AtTopLevel>
-        } & MetaData
-      >
-    : T
+// export type UnpackAsPaginator<
+//   T,
+//   MaxDepth extends number,
+//   Depth extends number,
+//   AtTopLevel extends boolean,
+// > =
+//   T extends Paginator<infer PaginatorCollection, infer DataProp, infer MetaData>
+//     ? Prettify<
+//         {
+//           [M in DataProp]: UnpackAsCollection<PaginatorCollection, MaxDepth, Depth, AtTopLevel>
+//         } & MetaData
+//       >
+//     : T
 
 /**
  * Unpack values as two sets of optional and required values, then merge them
@@ -420,10 +447,8 @@ export type UnpackValues<
   MaxDepth extends number,
   Depth extends number,
   AtTopLevel extends boolean,
-> = Prettify<
-  UnpackRequiredValues<Data, MaxDepth, Depth, AtTopLevel> &
-    UnpackOptionalValues<Data, MaxDepth, Depth, AtTopLevel>
->
+> = UnpackRequiredValues<Data, MaxDepth, Depth, AtTopLevel> &
+  UnpackOptionalValues<Data, MaxDepth, Depth, AtTopLevel>
 
 /**
  * Infers the serialized data structure of a resource by extracting the return type
@@ -455,7 +480,7 @@ export type InferData<
   MaxDepth extends number = -1,
   Depth extends number = 0,
 > = Transformer extends { [K in Variant]: (...args: any[]) => unknown }
-  ? UnpackValues<Awaited<ReturnType<Transformer[Variant]>>, MaxDepth, Depth, false>
+  ? Prettify<UnpackValues<Awaited<ReturnType<Transformer[Variant]>>, MaxDepth, Depth, false>>
   : never
 
 /**
@@ -535,10 +560,10 @@ export type SerializeFn = {
    * @param container - Optional container resolver for dependency injection
    * @returns Promise resolving to the serialized Item data
    */
-  <ResourceItem extends Item<any, any, any>>(
+  <ResourceItem extends ItemContract<any, any, any>>(
     resource: ResourceItem,
     container?: ContainerResolver<any>
-  ): Promise<UnpackAsItem<ResourceItem, -1, 0, true>>
+  ): Promise<UnpackAsTopLevelItem<ResourceItem>>
 
   /**
    * Serializes a Collection resource into an array of plain JavaScript objects.
@@ -548,10 +573,10 @@ export type SerializeFn = {
    * @param container - Optional container resolver for dependency injection
    * @returns Promise resolving to an array of serialized data
    */
-  <ResourceCollection extends Collection<any, any, any>>(
+  <ResourceCollection extends CollectionContract<any, any, any>>(
     collection: ResourceCollection,
     container?: ContainerResolver<any>
-  ): Promise<UnpackAsCollection<ResourceCollection, -1, 0, true>>
+  ): Promise<UnpackAsTopLevelCollection<ResourceCollection>>
 
   /**
    * Serializes a Paginator resource into paginated data with metadata.
@@ -561,10 +586,10 @@ export type SerializeFn = {
    * @param container - Optional container resolver for dependency injection
    * @returns Promise resolving to paginated data with metadata
    */
-  <ResourcePaginator extends Paginator<any, any, any>>(
-    paginator: ResourcePaginator,
-    container?: ContainerResolver<any>
-  ): Promise<UnpackAsPaginator<ResourcePaginator, -1, 0, true>>
+  // <ResourcePaginator extends Paginator<any, any, any>>(
+  //   paginator: ResourcePaginator,
+  //   container?: ContainerResolver<any>
+  // ): Promise<UnpackAsPaginator<ResourcePaginator, -1, 0, true>>
 
   /**
    * Serializes any other value by returning it as-is wrapped in a Promise.

@@ -11,7 +11,7 @@ import type { ContainerResolver } from '@adonisjs/fold'
 import { type RuntimeException } from '@poppinss/exception'
 
 import { transformAndSerialize } from '../utils.ts'
-import { type UnpackAsCollection, type ExtractTransformerVariants, type Next } from '../types.ts'
+import { type Next, type ExtractTransformerVariants, type InferData } from '../types.ts'
 
 /**
  * Represents a collection of transformers created for an array of source data.
@@ -148,8 +148,6 @@ export class Collection<
           maxDepth === -1 ? undefined : (maxDepth ?? this.maxDepth)
         )
       )
-    ) as unknown as Promise<
-      UnpackAsCollection<Collection<Transformer, MaxDepth, Variant>, -1, 0, true>
-    >
+    ) as unknown as Promise<InferData<Transformer, Variant, -1, 0>[]>
   }
 }

@@ -39,11 +39,7 @@ import type { ResourceDataTypes, SerializeFn } from './types.ts'
  * ```
  */
 export const serialize: SerializeFn = (
-  data:
-    | Record<string, ResourceDataTypes>
-    | Item<any, any, any>
-    | Collection<any, any, any>
-    | Paginator<any, any, any>,
+  data: Record<string, ResourceDataTypes> | Item<any, any, any> | Collection<any, any, any>,
   container?: ContainerResolver<any>
 ): any => {
   if (data === null) {
