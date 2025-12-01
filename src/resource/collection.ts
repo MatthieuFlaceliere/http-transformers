@@ -64,7 +64,7 @@ export class Collection<
    * @param debuggingError Runtime exception for debugging purposes
    */
   constructor(
-    protected transformerData: any[],
+    protected transformerData: [resource: any[], ...rest: any[]],
     public transformer: { new (...args: any[]): Transformer },
     public maxDepth: MaxDepth,
     public variant: Variant,
@@ -154,11 +154,13 @@ export class Collection<
    * @param maxDepth - Optional maximum depth override. When set to -1, uses unlimited depth
    */
   resolve(container: ContainerResolver<any>, depth: number, maxDepth?: number) {
+    const [resources, rest] = this.transformerData
+
     return Promise.all(
-      this.transformerData.map((row) =>
+      resources.map((row) =>
         transformAndResolve(
           container,
-          new this.transformer(row),
+          new this.transformer(row, ...rest),
           this.variant,
           depth,
           maxDepth === -1 ? undefined : (maxDepth ?? this.maxDepth)

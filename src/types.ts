@@ -8,8 +8,10 @@
  */
 
 import { type ContainerResolver } from '@adonisjs/fold'
-import { type Prettify, type ExtractUndefined, type ExtractDefined } from '@poppinss/types'
 import { type BaseTransformer } from './base_transformer.ts'
+import { type Prettify, type ExtractUndefined, type ExtractDefined } from '@poppinss/types'
+
+export type ExtractTransformerRestTypes<T> = T extends [any, ...infer A] ? A : never
 
 /**
  * Counter to increment the depth. At max we will allow fetching

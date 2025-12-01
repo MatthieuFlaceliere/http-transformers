@@ -58,7 +58,7 @@ export class Item<
    * @param debuggingError - Runtime exception for debugging purposes
    */
   constructor(
-    protected transformerData: any,
+    protected transformerData: [resource: any, ...rest: any[]],
     public transformer: { new (...args: any[]): Transformer },
     public maxDepth: MaxDepth,
     public variant: Variant,
@@ -147,10 +147,12 @@ export class Item<
    * @param maxDepth - Optional maximum depth override. When set to -1, uses unlimited depth
    */
   resolve(container: ContainerResolver<any>, depth: number, maxDepth?: number) {
+    const [resource, rest] = this.transformerData
+
     /**
      * If its undefined after unpacking, then throw an error
      */
-    if (this.transformerData === undefined) {
+    if (resource === undefined) {
       this.#debuggingError.message =
         'Cannot transform undefined value. Use "this.whenLoaded(value)" to allow undefined values'
       throw this.#debuggingError
@@ -158,7 +160,7 @@ export class Item<
 
     return transformAndResolve(
       container,
-      new this.transformer(this.transformerData),
+      new this.transformer(resource, ...rest),
       this.variant,
       depth,
       maxDepth === -1 ? undefined : (maxDepth ?? this.maxDepth)

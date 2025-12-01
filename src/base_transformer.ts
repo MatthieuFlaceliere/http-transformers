@@ -13,6 +13,7 @@ import { Maybe } from './maybe.ts'
 import { Item } from './resource/item.ts'
 import { Paginator } from './paginator.ts'
 import { Collection } from './resource/collection.ts'
+import { type ExtractTransformerRestTypes } from './types.ts'
 
 /**
  * Base class for creating custom data transformers. Provides utilities for transforming
@@ -64,9 +65,10 @@ export abstract class BaseTransformer<T> {
    *
    * @param data - Maybe-wrapped data that can be undefined
    */
-  static transform<Self extends { new (...args: any[]): any }>(
+  static transform<Self extends { new (resource: any, ...rest: any[]): any }>(
     this: Self,
-    data: Maybe<ConstructorParameters<Self>[0]>
+    data: Maybe<ConstructorParameters<Self>[0]>,
+    ...rest: ExtractTransformerRestTypes<ConstructorParameters<Self>>
   ): Item<InstanceType<Self>, 1, 'toObject'> | undefined
 
   /**
@@ -74,9 +76,10 @@ export abstract class BaseTransformer<T> {
    *
    * @param data - Single data object to transform
    */
-  static transform<Self extends { new (...args: any[]): any }>(
+  static transform<Self extends { new (resource: any, ...rest: any[]): any }>(
     this: Self,
-    data: ConstructorParameters<Self>[0]
+    data: ConstructorParameters<Self>[0],
+    ...rest: ExtractTransformerRestTypes<ConstructorParameters<Self>>
   ): Item<InstanceType<Self>, 1, 'toObject'>
 
   /**
@@ -84,9 +87,10 @@ export abstract class BaseTransformer<T> {
    *
    * @param data - Maybe-wrapped data that can be undefined or null
    */
-  static transform<Self extends { new (...args: any[]): any }>(
+  static transform<Self extends { new (resource: any, ...rest: any[]): any }>(
     this: Self,
-    data: Maybe<ConstructorParameters<Self>[0] | null>
+    data: Maybe<ConstructorParameters<Self>[0] | null>,
+    ...rest: ExtractTransformerRestTypes<ConstructorParameters<Self>>
   ): Item<InstanceType<Self>, 1, 'toObject'> | undefined | null
 
   /**
@@ -94,9 +98,10 @@ export abstract class BaseTransformer<T> {
    *
    * @param data - Single data object that can be null
    */
-  static transform<Self extends { new (...args: any[]): any }>(
+  static transform<Self extends { new (resource: any, ...rest: any[]): any }>(
     this: Self,
-    data: ConstructorParameters<Self>[0] | null
+    data: ConstructorParameters<Self>[0] | null,
+    ...rest: ExtractTransformerRestTypes<ConstructorParameters<Self>>
   ): Item<InstanceType<Self>, 1, 'toObject'> | null
 
   /**
@@ -104,9 +109,10 @@ export abstract class BaseTransformer<T> {
    *
    * @param data - Maybe-wrapped array that can be undefined
    */
-  static transform<Self extends { new (...args: any[]): any }>(
+  static transform<Self extends { new (resource: any, ...rest: any[]): any }>(
     this: Self,
-    data: Maybe<ConstructorParameters<Self>[0][]>
+    data: Maybe<ConstructorParameters<Self>[0][]>,
+    ...rest: ExtractTransformerRestTypes<ConstructorParameters<Self>>
   ): Collection<InstanceType<Self>, 1, 'toObject'> | undefined
 
   /**
@@ -114,9 +120,10 @@ export abstract class BaseTransformer<T> {
    *
    * @param data - Array of data objects to transform
    */
-  static transform<Self extends { new (...args: any[]): any }>(
+  static transform<Self extends { new (resource: any, ...rest: any[]): any }>(
     this: Self,
-    data: ConstructorParameters<Self>[0][]
+    data: ConstructorParameters<Self>[0][],
+    ...rest: ExtractTransformerRestTypes<ConstructorParameters<Self>>
   ): Collection<InstanceType<Self>, 1, 'toObject'>
 
   /**
@@ -131,7 +138,8 @@ export abstract class BaseTransformer<T> {
       | null
       | Maybe<ConstructorParameters<Self>[0] | null>
       | ConstructorParameters<Self>[0][]
-      | Maybe<ConstructorParameters<Self>[0][]>
+      | Maybe<ConstructorParameters<Self>[0][]>,
+    ...rest: ExtractTransformerRestTypes<ConstructorParameters<Self>>
   ) {
     /**
      * If optional values are allowed and the value is undefined, then
@@ -144,7 +152,7 @@ export abstract class BaseTransformer<T> {
     }
 
     if (Array.isArray(unwrappedValue)) {
-      return new Collection(unwrappedValue, this, 1, 'toObject', new RuntimeException())
+      return new Collection([unwrappedValue, rest], this, 1, 'toObject', new RuntimeException())
     }
 
     if (unwrappedValue === null) {
@@ -152,7 +160,7 @@ export abstract class BaseTransformer<T> {
     }
 
     return new Item<InstanceType<Self>, 1, 'toObject'>(
-      unwrappedValue,
+      [unwrappedValue, rest],
       this,
       1,
       'toObject',
@@ -180,13 +188,17 @@ export abstract class BaseTransformer<T> {
    * )
    * ```
    */
-  static paginate<Self extends { new (...args: any[]): any }, MetaData extends Record<string, any>>(
+  static paginate<
+    Self extends { new (resource: any, ...rest: any[]): any },
+    MetaData extends Record<string, any>,
+  >(
     this: Self,
     data: ConstructorParameters<Self>[0][],
-    metaData: MetaData
+    metaData: MetaData,
+    ...rest: ExtractTransformerRestTypes<ConstructorParameters<Self>>
   ): Paginator<Collection<InstanceType<Self>, 1, 'toObject'>, MetaData> {
     return new Paginator(
-      new Collection(data, this, 1, 'toObject', new RuntimeException()),
+      new Collection([data, rest], this, 1, 'toObject', new RuntimeException()),
       metaData
     )
   }

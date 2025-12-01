@@ -1064,8 +1064,10 @@ test.group('Transformer', () => {
     )
     assert.deepEqual(userData, {
       data: [{ id: 1, fullName: null, email: 'foo@bar.com' }],
-      total: 1,
-      currentPage: 1,
+      meta: {
+        total: 1,
+        currentPage: 1,
+      },
     })
     expectTypeOf(userData).toEqualTypeOf<{
       meta: {
@@ -1111,9 +1113,11 @@ test.group('Transformer', () => {
 
     assert.deepEqual(userData, {
       data: [{ id: 1, fullName: null, email: 'foo@bar.com' }],
-      currentPage: 1,
-      lastPage: 1,
-      total: 10,
+      meta: {
+        currentPage: 1,
+        lastPage: 1,
+        total: 10,
+      },
     })
     expectTypeOf(userData).toEqualTypeOf<{
       meta: {
@@ -1164,9 +1168,11 @@ test.group('Transformer', () => {
 
     assert.deepEqual(userData, {
       data: [{ id: 1, fullName: null, email: 'foo@bar.com' }],
-      currentPage: 1,
-      lastPage: 1,
-      total: 10,
+      meta: {
+        currentPage: 1,
+        lastPage: 1,
+        total: 10,
+      },
     })
     expectTypeOf(userData).toEqualTypeOf<{
       meta: {
@@ -1186,5 +1192,122 @@ test.group('Transformer', () => {
     const userData = await serialize([1, 2, 3] as const)
     expectTypeOf(userData).toEqualTypeOf<readonly [1, 2, 3]>()
     assert.deepEqual(userData, [1, 2, 3])
+  })
+
+  test('pass additional parameters to the transformer constructor', async ({
+    assert,
+    expectTypeOf,
+  }) => {
+    class Email {
+      declare id: number
+      declare email: string
+      declare isVerified: boolean
+    }
+
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare emails: Email[]
+    }
+
+    class EmailTransformer extends BaseTransformer<Email> {
+      constructor(
+        email: Email,
+        protected sendVerificationTick: boolean
+      ) {
+        super(email)
+      }
+
+      toObject() {
+        return {
+          id: this.resource.id,
+          email: this.resource.email,
+          ...(this.sendVerificationTick ? { isVerified: this.resource.isVerified } : {}),
+        }
+      }
+    }
+
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          emails: EmailTransformer.transform(this.resource.emails, false),
+        }
+      }
+    }
+
+    const user = new User()
+    const email = new Email()
+    email.id = 1
+    email.email = 'foo@bar.com'
+    email.isVerified = true
+
+    user.id = 1
+    user.fullName = null
+    user.emails = [email]
+
+    const userData = await serialize(UserTransformer.transform([user]))
+    assert.deepEqual(userData, [
+      {
+        id: 1,
+        fullName: null,
+        emails: [{ id: 1, email: 'foo@bar.com' }],
+      },
+    ])
+    expectTypeOf(userData).toEqualTypeOf<
+      {
+        id: number
+        fullName: string | null
+        emails: { id: number; email: string; isVerified?: boolean | undefined }[]
+      }[]
+    >()
+  })
+
+  test('pass additional parameters to the transformer constructor during pagination', async ({
+    assert,
+    expectTypeOf,
+  }) => {
+    class Email {
+      declare id: number
+      declare email: string
+      declare isVerified: boolean
+    }
+
+    class EmailTransformer extends BaseTransformer<Email> {
+      constructor(
+        email: Email,
+        protected sendVerificationTick: boolean
+      ) {
+        super(email)
+      }
+
+      toObject() {
+        return {
+          id: this.resource.id,
+          email: this.resource.email,
+          ...(this.sendVerificationTick ? { isVerified: this.resource.isVerified } : {}),
+        }
+      }
+    }
+
+    const email = new Email()
+    email.id = 1
+    email.email = 'foo@bar.com'
+    email.isVerified = true
+
+    const emailData = await serialize(EmailTransformer.paginate([email], {}, true))
+    assert.deepEqual(emailData, {
+      data: [{ id: 1, email: 'foo@bar.com', isVerified: true }],
+      meta: {},
+    })
+    expectTypeOf(emailData).toEqualTypeOf<{
+      data: {
+        id: number
+        email: string
+        isVerified?: boolean | undefined
+      }[]
+      meta: {}
+    }>()
   })
 })
