@@ -117,7 +117,7 @@ export type SerializeJSONObject<T> = {
  * }
  * ```
  */
-export interface ExtendJSONTypes {}
+export interface ExtendedJSONTypes {}
 
 /**
  * Types that are not allowed in JSON serialization by default.
@@ -130,8 +130,8 @@ export type NonAllowedJSTypes = Map<any, any> | Set<any>
  * interface extension point.
  */
 export type ForcefullyAllowedTypes = {
-  [K in keyof ExtendJSONTypes]: ExtendJSONTypes[K]
-}[keyof ExtendJSONTypes]
+  [K in keyof ExtendedJSONTypes]: ExtendedJSONTypes[K]
+}[keyof ExtendedJSONTypes]
 
 /**
  * Helper type to recursively serialize types, handling primitives, arrays, and objects.

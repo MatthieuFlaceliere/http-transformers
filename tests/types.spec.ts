@@ -22,7 +22,7 @@ import { ProfileTransformer } from './fixtures/transformers/profile.ts'
 import { type InferVariants, type InferData, type ResourceData } from '../src/types.ts'
 
 declare module '../src/types.ts' {
-  interface ExtendJSONTypes {
+  interface ExtendedJSONTypes {
     bigInt: BigInt
   }
 }
