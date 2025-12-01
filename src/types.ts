@@ -324,11 +324,11 @@ export interface PaginatorContract<
  * ```
  */
 export type ExtractTransformerVariants<Transformer> = {
-  [K in keyof Transformer & string]: Transformer[K] extends (
-    ...args: any[]
-  ) => ResourceData | Promise<ResourceData>
-    ? K
-    : never
+  [K in keyof Transformer & string]: K extends keyof BaseTransformer<any>
+    ? never
+    : Transformer[K] extends (...args: any[]) => ResourceData | Promise<ResourceData>
+      ? K
+      : never
 }[keyof Transformer & string]
 
 /**
