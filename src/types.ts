@@ -184,8 +184,11 @@ export type SerializeJSONOwnTypes<T> = T extends JSONPrimitives
  * // Result: { id: number; name: string }
  * ```
  */
-export type SerializeJSONTypes<T> =
-  T extends CanBeSerialized<infer A> ? SerializeJSONOwnTypes<A> : SerializeJSONOwnTypes<T>
+export type SerializeJSONTypes<T> = T extends ForcefullyAllowedTypes
+  ? T
+  : T extends CanBeSerialized<infer A>
+    ? SerializeJSONOwnTypes<A>
+    : SerializeJSONOwnTypes<T>
 
 /**
  * Contract interface for Item instances used in type inference. An Item represents
