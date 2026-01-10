@@ -312,7 +312,7 @@ export interface PaginatorContract<PaginatorCollection extends CollectionContrac
   /**
    * Pagination metadata (page numbers, total count, etc.)
    */
-  metaData: Record<string, any>
+  metaData: any
 }
 
 /**
@@ -546,7 +546,7 @@ export type UnpackAsTopLevelPaginator<T, Wrapper extends string, TransformedMeta
       : Prettify<
           {
             [K in Wrapper]: UnpackAsTopLevelCollection<Collection, undefined>
-          } & { metadata: Record<string, any> }
+          } & { metadata: any }
         >
     : never
 
@@ -586,14 +586,14 @@ export type UnpackTopLevelValues<Data> = Prettify<
     [K in ExtractDefined<Data>]: Data[K] extends PaginatorContract<infer Collection>
       ? {
           data: UnpackAsTopLevelCollection<Collection, undefined>
-          metadata: Record<string, any>
+          metadata: any
         }
       : UnpackKeyValue<SplitItm<Data[K]>, -1, 0>
   } & {
     [K in ExtractUndefined<Data>]?: Data[K] extends PaginatorContract<infer Collection>
       ? {
           data: UnpackAsTopLevelCollection<Collection, undefined>
-          metadata: Record<string, any>
+          metadata: any
         }
       : UnpackKeyValue<SplitItm<Data[K]>, -1, 0>
   }

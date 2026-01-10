@@ -52,7 +52,7 @@ export class Paginator<PaginatorCollection extends Collection<any, any, any>> {
    */
   constructor(
     public collection: PaginatorCollection,
-    public metaData: Record<string, any>
+    public metaData: any
   ) {}
 
   /**
