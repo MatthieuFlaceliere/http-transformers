@@ -8,10 +8,10 @@
  */
 
 import { test } from '@japa/runner'
-import { Container, inject } from '@adonisjs/fold'
+import { inject } from '@adonisjs/fold'
 import { type InferData } from '../src/types.ts'
 import { BaseTransformer } from '../src/base_transformer.ts'
-import { apiSerializer, wrappedApiSerializer } from './helpers.ts'
+import { apiSerializer, container, wrappedApiSerializer } from './helpers.ts'
 
 test.group('Transformer', () => {
   test('throw error when value is null', async ({ expectTypeOf }) => {
@@ -30,7 +30,10 @@ test.group('Transformer', () => {
       }
     }
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(null)!)
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(null)!,
+      container.createResolver()
+    )
     expectTypeOf(userData).toEqualTypeOf<{
       id: number
       fullName: string | null
@@ -54,7 +57,10 @@ test.group('Transformer', () => {
       }
     }
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(undefined as any)!)
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(undefined as any)!,
+      container.createResolver()
+    )
     expectTypeOf(userData).toEqualTypeOf<{
       id: number
       fullName: string | null
@@ -80,9 +86,12 @@ test.group('Transformer', () => {
       }
     }
 
-    const userData = await apiSerializer.serialize({
-      user: UserTransformer.transform(null),
-    })
+    const userData = await apiSerializer.serialize(
+      {
+        user: UserTransformer.transform(null),
+      },
+      container.createResolver()
+    )
 
     assert.deepEqual(userData, { user: null })
     expectTypeOf(userData).toEqualTypeOf<{
@@ -110,7 +119,10 @@ test.group('Transformer', () => {
       }
     }
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(undefined as any)!)
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(undefined as any)!,
+      container.createResolver()
+    )
     expectTypeOf(userData).toEqualTypeOf<{ id: number; fullName: string | null; email: string }>()
   }).throws(
     'Cannot transform undefined value. Use "this.whenLoaded(value)" to allow undefined values'
@@ -137,7 +149,10 @@ test.group('Transformer', () => {
     user.fullName = null
     user.email = 'foo@bar.com'
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(user))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
     assert.deepEqual(userData, { id: 1, fullName: null, email: 'foo@bar.com' })
     expectTypeOf(userData).toEqualTypeOf<{ id: number; fullName: string | null; email: string }>()
   })
@@ -187,7 +202,10 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(user))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
     assert.deepEqual(userData, {
       id: 1,
       fullName: null,
@@ -243,7 +261,10 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform([user]))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform([user]),
+      container.createResolver()
+    )
     assert.deepEqual(userData, [
       {
         id: 1,
@@ -297,7 +318,7 @@ test.group('Transformer', () => {
     user.id = 1
     user.fullName = null
 
-    await apiSerializer.serialize(UserTransformer.transform(user))
+    await apiSerializer.serialize(UserTransformer.transform(user), container.createResolver())
   }).throws(
     'Cannot transform undefined value. Use "this.whenLoaded(value)" to allow undefined values'
   )
@@ -342,7 +363,10 @@ test.group('Transformer', () => {
     user.id = 1
     user.fullName = null
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(user))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
     assert.deepEqual(userData, {
       id: 1,
       fullName: null,
@@ -403,7 +427,10 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(user))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
     assert.deepEqual(userData, {
       id: 1,
       fullName: null,
@@ -461,7 +488,10 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(user))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
 
     expectTypeOf(userData).toEqualTypeOf<{
       id: number
@@ -528,7 +558,10 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(user))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
     assert.snapshot(userData).matchInline(`
       {
         "emails": [
@@ -644,7 +677,10 @@ test.group('Transformer', () => {
     user.fullName = null
     user.email = null
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(user))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
     assert.deepEqual(userData, { id: 1, fullName: null, email: null })
     expectTypeOf(userData).toEqualTypeOf<{
       id: number
@@ -693,7 +729,10 @@ test.group('Transformer', () => {
     user.id = 1
     user.fullName = null
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(user))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
     expectTypeOf(userData).toEqualTypeOf<{
       id: number
       fullName: string | null
@@ -728,7 +767,10 @@ test.group('Transformer', () => {
     user.fullName = null
     user.email = 'foo@bar.com'
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(user))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
     assert.deepEqual(userData, { id: 1, fullName: null, email: 'foo@bar.com' })
     expectTypeOf(userData).toEqualTypeOf<{
       id: number
@@ -758,7 +800,10 @@ test.group('Transformer', () => {
     user.fullName = null
     user.email = 'foo@bar.com'
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform([user]))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform([user]),
+      container.createResolver()
+    )
     assert.deepEqual(userData, [{ id: 1, fullName: null, email: 'foo@bar.com' }])
     expectTypeOf(userData).toEqualTypeOf<
       {
@@ -813,7 +858,8 @@ test.group('Transformer', () => {
     user.fullName = null
 
     const userData = await apiSerializer.serialize(
-      UserTransformer.transform(user).useVariant('basicInfo')
+      UserTransformer.transform(user).useVariant('basicInfo'),
+      container.createResolver()
     )
     assert.deepEqual(userData, {
       id: 1,
@@ -869,7 +915,8 @@ test.group('Transformer', () => {
     user.fullName = null
 
     const userData = await apiSerializer.serialize(
-      UserTransformer.transform(user).useVariant('basicInfo')
+      UserTransformer.transform(user).useVariant('basicInfo'),
+      container.createResolver()
     )
     assert.deepEqual(userData, {
       id: 1,
@@ -926,7 +973,8 @@ test.group('Transformer', () => {
     user.fullName = null
 
     const userData = await apiSerializer.serialize(
-      UserTransformer.transform([user]).useVariant('basicInfo')
+      UserTransformer.transform([user]).useVariant('basicInfo'),
+      container.createResolver()
     )
     assert.deepEqual(userData, [
       {
@@ -969,11 +1017,11 @@ test.group('Transformer', () => {
     user.fullName = null
     user.email = 'foo@bar.com'
 
-    const container = new Container().createResolver()
-    container.bindValue(Logger, new Logger())
+    const resolver = container.createResolver()
+    resolver.bindValue(Logger, new Logger())
     const userData = await apiSerializer.serialize(
       UserTransformer.transform(user).useVariant('toObject'),
-      container
+      resolver
     )
 
     assert.deepEqual(userData, {
@@ -1028,7 +1076,10 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform(user))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
     assert.deepEqual(userData, {
       id: 1,
       fullName: null,
@@ -1066,7 +1117,8 @@ test.group('Transformer', () => {
       UserTransformer.paginate([user], {
         total: 1,
         currentPage: 1,
-      })
+      }),
+      container.createResolver()
     )
     assert.deepEqual(userData, {
       data: [{ id: 1, fullName: null, email: 'foo@bar.com' }],
@@ -1086,7 +1138,7 @@ test.group('Transformer', () => {
   })
 
   test('return non-serializable values as it is', async ({ assert, expectTypeOf }) => {
-    const userData = await apiSerializer.serialize([1, 2, 3] as const)
+    const userData = await apiSerializer.serialize([1, 2, 3] as const, container.createResolver())
     expectTypeOf(userData).toEqualTypeOf<readonly [1, 2, 3]>()
     assert.deepEqual(userData, [1, 2, 3])
   })
@@ -1144,7 +1196,10 @@ test.group('Transformer', () => {
     user.fullName = null
     user.emails = [email]
 
-    const userData = await apiSerializer.serialize(UserTransformer.transform([user]))
+    const userData = await apiSerializer.serialize(
+      UserTransformer.transform([user]),
+      container.createResolver()
+    )
     assert.deepEqual(userData, [
       {
         id: 1,
@@ -1193,7 +1248,10 @@ test.group('Transformer', () => {
     email.email = 'foo@bar.com'
     email.isVerified = true
 
-    const emailData = await apiSerializer.serialize(EmailTransformer.paginate([email], {}, true))
+    const emailData = await apiSerializer.serialize(
+      EmailTransformer.paginate([email], {}, true),
+      container.createResolver()
+    )
     assert.deepEqual(emailData, {
       data: [{ id: 1, email: 'foo@bar.com', isVerified: true }],
       metadata: {},
@@ -1231,7 +1289,10 @@ test.group('Transformer | wrapping', () => {
     user.fullName = null
     user.email = 'foo@bar.com'
 
-    const userData = await wrappedApiSerializer.serialize(UserTransformer.transform(user))
+    const userData = await wrappedApiSerializer.serialize(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
     type UserData = InferData<UserTransformer>
 
     expectTypeOf(userData).toEqualTypeOf<{
@@ -1263,7 +1324,10 @@ test.group('Transformer | wrapping', () => {
     user.fullName = null
     user.email = 'foo@bar.com'
 
-    const userData = await wrappedApiSerializer.serialize(UserTransformer.transform([user]))
+    const userData = await wrappedApiSerializer.serialize(
+      UserTransformer.transform([user]),
+      container.createResolver()
+    )
     type UserData = InferData<UserTransformer>
 
     expectTypeOf(userData).toEqualTypeOf<{ data: UserData[] }>()
@@ -1295,7 +1359,10 @@ test.group('Transformer | wrapping', () => {
     user.fullName = null
     user.email = 'foo@bar.com'
 
-    const userData = await wrappedApiSerializer.serialize(UserTransformer.paginate([user], {}))
+    const userData = await wrappedApiSerializer.serialize(
+      UserTransformer.paginate([user], {}),
+      container.createResolver()
+    )
     type UserData = InferData<UserTransformer>
 
     expectTypeOf(userData.data).toEqualTypeOf<UserData[]>()
@@ -1357,7 +1424,10 @@ test.group('Transformer | wrapping', () => {
     post.title = 'hello world'
     post.user = user
 
-    const postData = await wrappedApiSerializer.serialize(PostTransformer.transform(post))
+    const postData = await wrappedApiSerializer.serialize(
+      PostTransformer.transform(post),
+      container.createResolver()
+    )
     type PostData = InferData<PostTransformer>
 
     expectTypeOf(postData.data).toEqualTypeOf<PostData>()

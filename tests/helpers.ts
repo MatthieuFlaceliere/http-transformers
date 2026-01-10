@@ -1,3 +1,4 @@
+import { Container } from '@adonisjs/fold'
 import { BaseSerializer } from '../src/base_serializer.ts'
 
 class ApiSerializer extends BaseSerializer<{
@@ -27,3 +28,4 @@ class WrappedApiSerializer extends BaseSerializer<{
 
 export const apiSerializer = new ApiSerializer()
 export const wrappedApiSerializer = new WrappedApiSerializer()
+export const container = new Container()

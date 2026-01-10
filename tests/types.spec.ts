@@ -9,7 +9,7 @@
 
 import { test } from '@japa/runner'
 import { debug } from '../src/debug.ts'
-import { apiSerializer } from './helpers.ts'
+import { apiSerializer, container } from './helpers.ts'
 import { User } from './fixtures/models/user.ts'
 import { Post } from './fixtures/models/posts.ts'
 import { Email } from './fixtures/models/email.ts'
@@ -51,7 +51,10 @@ test.group('Types', () => {
     }
 
     const exampleTransformer = new ExampleTransformer({})
-    const exampleDataObject = await apiSerializer.serialize(ExampleTransformer.transform({}))
+    const exampleDataObject = await apiSerializer.serialize(
+      ExampleTransformer.transform({}),
+      container.createResolver()
+    )
     type ExampleData = InferData<typeof exampleTransformer>
     debug('%O', exampleDataObject)
 
@@ -100,7 +103,10 @@ test.group('Types', () => {
     }
 
     const exampleTransformer = new ExampleTransformer({})
-    const exampleDataObject = await apiSerializer.serialize(ExampleTransformer.transform({}))
+    const exampleDataObject = await apiSerializer.serialize(
+      ExampleTransformer.transform({}),
+      container.createResolver()
+    )
     type ExampleData = InferData<typeof exampleTransformer>
     debug('%O', exampleDataObject)
 
@@ -154,7 +160,10 @@ test.group('Types', () => {
     }
 
     const exampleTransformer = new ExampleTransformer({})
-    const exampleDataObject = await apiSerializer.serialize(ExampleTransformer.transform({}))
+    const exampleDataObject = await apiSerializer.serialize(
+      ExampleTransformer.transform({}),
+      container.createResolver()
+    )
     type ExampleData = InferData<typeof exampleTransformer>
     debug('%O', exampleDataObject)
 
@@ -194,7 +203,7 @@ test.group('Types', () => {
       }
     }
 
-    await apiSerializer.serialize(ExampleTransformer.transform({}))
+    await apiSerializer.serialize(ExampleTransformer.transform({}), container.createResolver())
   })
 
   test('disallow returning non-serializable values', async () => {
@@ -209,7 +218,10 @@ test.group('Types', () => {
       }
     }
 
-    const r = await apiSerializer.serialize(ExampleTransformer.transform({}))
+    const r = await apiSerializer.serialize(
+      ExampleTransformer.transform({}),
+      container.createResolver()
+    )
     console.log(r)
   })
 
@@ -225,7 +237,10 @@ test.group('Types', () => {
     }
 
     const exampleTransformer = new ExampleTransformer({})
-    const exampleDataObject = await apiSerializer.serialize(ExampleTransformer.transform({}))
+    const exampleDataObject = await apiSerializer.serialize(
+      ExampleTransformer.transform({}),
+      container.createResolver()
+    )
     type ExampleData = InferData<typeof exampleTransformer>
     expectTypeOf<ExampleData>().toEqualTypeOf<{
       id: number
@@ -239,7 +254,10 @@ test.group('Types | Fixtures', () => {
   test('infer graph of post transformer', async ({ expectTypeOf }) => {
     const post = new Post()
     const postTransformer = new PostTransformer(post)
-    const postDataObject = await apiSerializer.serialize(PostTransformer.transform(post))
+    const postDataObject = await apiSerializer.serialize(
+      PostTransformer.transform(post),
+      container.createResolver()
+    )
 
     type PostData = InferData<typeof postTransformer>
     debug('%O', postDataObject)
@@ -295,7 +313,10 @@ test.group('Types | Fixtures', () => {
     user.posts = [new Post()]
 
     const userTransformer = new UserTransformer(user)
-    const userDataObject = await apiSerializer.serialize(UserTransformer.transform(user))
+    const userDataObject = await apiSerializer.serialize(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
     type UserData = InferData<typeof userTransformer>
 
     debug('%o', userDataObject)
@@ -354,7 +375,10 @@ test.group('Types | Fixtures', () => {
     profile.user.posts = [new Post()]
 
     const profileTransformer = new ProfileTransformer(profile)
-    const profileDataObject = await apiSerializer.serialize(ProfileTransformer.transform(profile))
+    const profileDataObject = await apiSerializer.serialize(
+      ProfileTransformer.transform(profile),
+      container.createResolver()
+    )
     type ProfileData = InferData<typeof profileTransformer>
 
     debug('%O', profileDataObject)
@@ -386,7 +410,10 @@ test.group('Types | Fixtures', () => {
     email.profile = profile
 
     const emailTransformer = new EmailTransformer(email)
-    const emailDataObject = await apiSerializer.serialize(EmailTransformer.transform(email))
+    const emailDataObject = await apiSerializer.serialize(
+      EmailTransformer.transform(email),
+      container.createResolver()
+    )
     type EmailData = InferData<typeof emailTransformer>
 
     debug('%o', emailDataObject)
@@ -412,7 +439,8 @@ test.group('Types | Fixtures', () => {
     const user = new User()
     const userTransformer = new UserTransformer(user)
     const userDataObject = await apiSerializer.serialize(
-      UserTransformer.transform(user).useVariant('basicInfo')
+      UserTransformer.transform(user).useVariant('basicInfo'),
+      container.createResolver()
     )
 
     type UserData = InferVariants<typeof userTransformer>

@@ -7,7 +7,7 @@
  * file that was distributed with this source code.
  */
 
-import { Container, type ContainerResolver } from '@adonisjs/fold'
+import { type ContainerResolver } from '@adonisjs/fold'
 import { RuntimeException } from '@poppinss/exception'
 
 import { Item } from './resource/item.ts'
@@ -94,7 +94,7 @@ export abstract class BaseSerializer<
    */
   serialize<Data extends Record<string, ResourceDataTypes | PaginatorContract<any>>>(
     data: Data,
-    container?: ContainerResolver<any>
+    resolver: ContainerResolver<any>
   ): Promise<UnpackTopLevelValues<Data>>
 
   /**
@@ -105,7 +105,7 @@ export abstract class BaseSerializer<
    */
   serialize<ResourceItem extends ItemContract<any, any, any>>(
     resource: ResourceItem,
-    container?: ContainerResolver<any>
+    resolver: ContainerResolver<any>
   ): Promise<UnpackAsTopLevelItem<ResourceItem, Wrappers['Wrap']>>
 
   /**
@@ -116,7 +116,7 @@ export abstract class BaseSerializer<
    */
   serialize<ResourceCollection extends CollectionContract<any, any, any>>(
     collection: ResourceCollection,
-    container?: ContainerResolver<any>
+    resolver: ContainerResolver<any>
   ): Promise<UnpackAsTopLevelCollection<ResourceCollection, Wrappers['Wrap']>>
 
   /**
@@ -127,7 +127,7 @@ export abstract class BaseSerializer<
    */
   serialize<ResourcePaginator extends PaginatorContract<any>>(
     paginator: ResourcePaginator,
-    container?: ContainerResolver<any>
+    resolver: ContainerResolver<any>
   ): Promise<
     UnpackAsTopLevelPaginator<
       ResourcePaginator,
@@ -142,16 +142,15 @@ export abstract class BaseSerializer<
    * @param value - The value to serialize
    * @param container - Optional container resolver for dependency injection
    */
-  serialize<Value>(value: Value, container?: ContainerResolver<any>): Promise<Value>
+  serialize<Value>(value: Value, container: ContainerResolver<any>): Promise<Value>
   serialize(
     data: Record<string, ResourceDataTypes> | Item<any, any, any> | Collection<any, any, any>,
-    container?: ContainerResolver<any>
+    resolver: ContainerResolver<any>
   ): Promise<any> {
     if (data === null) {
       throw new RuntimeException('Cannot serialize an item with null value')
     }
 
-    const resolver = container ?? new Container().createResolver()
     if (data instanceof Item) {
       return data.resolve(resolver, 0, -1).then((value) => this.#wrap(value, this.wrap))
     }
