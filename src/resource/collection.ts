@@ -10,7 +10,7 @@
 import type { ContainerResolver } from '@adonisjs/fold'
 import { type RuntimeException } from '@poppinss/exception'
 
-import { transformAndResolve } from '../utils.ts'
+import { transformAndResolve } from '../helpers.ts'
 import {
   type Next,
   type ExtractTransformerVariants,

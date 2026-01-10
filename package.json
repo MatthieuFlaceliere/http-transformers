@@ -15,6 +15,7 @@
   "main": "build/index.js",
   "exports": {
     ".": "./build/index.js",
+    "./helpers": "./build/src/helpers.js",
     "./types": "./build/src/types.js"
   },
   "scripts": {
@@ -88,6 +89,7 @@
   "tsdown": {
     "entry": [
       "index.ts",
+      "src/helpers.ts",
       "src/types.ts"
     ],
     "outDir": "./build",

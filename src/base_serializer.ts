@@ -12,7 +12,7 @@ import { RuntimeException } from '@poppinss/exception'
 
 import { Item } from './resource/item.ts'
 import { Paginator } from './paginator.ts'
-import { isObject, resolveValues } from './utils.ts'
+import { isObject, resolveValues } from './helpers.ts'
 import { Collection } from './resource/collection.ts'
 import {
   type ItemContract,
