@@ -7,10 +7,21 @@
  * file that was distributed with this source code.
  */
 
-import { type ContainerResolver } from '@adonisjs/fold'
 import { type BaseTransformer } from './base_transformer.ts'
 import { type Prettify, type ExtractUndefined, type ExtractDefined } from '@poppinss/types'
 
+/**
+ * Extracts rest parameters from transformer constructor parameters, excluding the first parameter.
+ * Used to preserve additional constructor arguments when creating transformer instances.
+ *
+ * @template T - The constructor parameter tuple to extract from
+ *
+ * ```typescript
+ * type Params = [User, boolean, string]
+ * type Rest = ExtractTransformerRestTypes<Params>
+ * // Result: [boolean, string]
+ * ```
+ */
 export type ExtractTransformerRestTypes<T> = T extends [any, ...infer A] ? A : never
 
 /**
@@ -289,10 +300,7 @@ export interface CollectionContract<
  * }
  * ```
  */
-export interface PaginatorContract<
-  PaginatorCollection extends CollectionContract<any, any, any>,
-  MetaData extends Record<string, any>,
-> {
+export interface PaginatorContract<PaginatorCollection extends CollectionContract<any, any, any>> {
   /**
    * Discriminator property to identify this as a Paginator type
    */
@@ -304,7 +312,7 @@ export interface PaginatorContract<
   /**
    * Pagination metadata (page numbers, total count, etc.)
    */
-  metaData: MetaData
+  metaData: Record<string, any>
 }
 
 /**
@@ -492,9 +500,13 @@ export type SplitItm<T> = [
  *
  * @internal
  */
-export type UnpackAsTopLevelItem<T> =
+export type UnpackAsTopLevelItem<T, Wrapper extends string | undefined> =
   T extends ItemContract<infer Transformer, any, infer Variant>
-    ? InferData<Transformer, Variant, -1, 0>
+    ? Wrapper extends string
+      ? {
+          [K in Wrapper]: InferData<Transformer, Variant, -1, 0>
+        }
+      : InferData<Transformer, Variant, -1, 0>
     : never
 
 /**
@@ -505,9 +517,13 @@ export type UnpackAsTopLevelItem<T> =
  *
  * @internal
  */
-export type UnpackAsTopLevelCollection<T> =
+export type UnpackAsTopLevelCollection<T, Wrapper extends string | undefined> =
   T extends CollectionContract<infer Transformer, any, infer Variant>
-    ? InferData<Transformer, Variant, -1, 0>[]
+    ? Wrapper extends string
+      ? {
+          [K in Wrapper]: InferData<Transformer, Variant, -1, 0>[]
+        }
+      : InferData<Transformer, Variant, -1, 0>[]
     : never
 
 /**
@@ -519,12 +535,19 @@ export type UnpackAsTopLevelCollection<T> =
  *
  * @internal
  */
-export type UnpackAsTopLevelPaginator<T> =
-  T extends PaginatorContract<infer Collection, infer MetaData>
-    ? {
-        data: UnpackAsTopLevelCollection<Collection>
-        meta: MetaData
-      }
+export type UnpackAsTopLevelPaginator<T, Wrapper extends string, TransformedMetaData> =
+  T extends PaginatorContract<infer Collection>
+    ? TransformedMetaData extends Record<string, any>
+      ? Prettify<
+          {
+            [K in Wrapper]: UnpackAsTopLevelCollection<Collection, undefined>
+          } & { metadata: TransformedMetaData }
+        >
+      : Prettify<
+          {
+            [K in Wrapper]: UnpackAsTopLevelCollection<Collection, undefined>
+          } & { metadata: Record<string, any> }
+        >
     : never
 
 /**
@@ -560,20 +583,17 @@ export type UnpackValues<Data, MaxDepth extends number, Depth extends number> = 
  */
 export type UnpackTopLevelValues<Data> = Prettify<
   {
-    [K in ExtractDefined<Data>]: Data[K] extends PaginatorContract<infer Collection, infer MetaData>
+    [K in ExtractDefined<Data>]: Data[K] extends PaginatorContract<infer Collection>
       ? {
-          data: UnpackAsTopLevelCollection<Collection>
-          meta: MetaData
+          data: UnpackAsTopLevelCollection<Collection, undefined>
+          metadata: Record<string, any>
         }
       : UnpackKeyValue<SplitItm<Data[K]>, -1, 0>
   } & {
-    [K in ExtractUndefined<Data>]?: Data[K] extends PaginatorContract<
-      infer Collection,
-      infer MetaData
-    >
+    [K in ExtractUndefined<Data>]?: Data[K] extends PaginatorContract<infer Collection>
       ? {
-          data: UnpackAsTopLevelCollection<Collection>
-          meta: MetaData
+          data: UnpackAsTopLevelCollection<Collection, undefined>
+          metadata: Record<string, any>
         }
       : UnpackKeyValue<SplitItm<Data[K]>, -1, 0>
   }
@@ -649,89 +669,4 @@ export type InferVariants<Transformer, MaxDepth extends number = -1, Depth exten
           : never
   }[keyof Transformer] &
     string]: InferData<Transformer, O, MaxDepth, Depth>
-}
-
-/**
- * Function interface for the main serialize function that handles different data types.
- * Provides overloads for serializing Items, Collections, Paginators, and resource data.
- *
- * ```typescript
- * const serialize: SerializeFn = (data, container) => {
- *   // Implementation handles different data types
- *   return Promise.resolve(serializedData)
- * }
- *
- * // Usage examples:
- * const userItem = UserTransformer.transform(userData)
- * const serializedUser = await serialize(userItem)
- *
- * const usersCollection = UserTransformer.transform(usersData)
- * const serializedUsers = await serialize(usersCollection)
- * ```
- */
-export type SerializeFn = {
-  /**
-   * Serializes a record of resource data types into plain JavaScript objects. The
-   * top-level object passed to the serialize function could contain paginator
-   * objects as well.
-   *
-   * @template Data - Record type containing resource data
-   * @param data - The resource data record to serialize
-   * @param container - Optional container resolver for dependency injection
-   * @returns Promise resolving to unpacked and serialized data
-   */
-  <Data extends Record<string, ResourceDataTypes | PaginatorContract<any, any>>>(
-    data: Data,
-    container?: ContainerResolver<any>
-  ): Promise<UnpackTopLevelValues<Data>>
-
-  /**
-   * Serializes an Item resource into its plain JavaScript representation.
-   *
-   * @template ResourceItem - Item type to serialize
-   * @param resource - The Item resource to serialize
-   * @param container - Optional container resolver for dependency injection
-   * @returns Promise resolving to the serialized Item data
-   */
-  <ResourceItem extends ItemContract<any, any, any>>(
-    resource: ResourceItem,
-    container?: ContainerResolver<any>
-  ): Promise<UnpackAsTopLevelItem<ResourceItem>>
-
-  /**
-   * Serializes a Collection resource into an array of plain JavaScript objects.
-   *
-   * @template ResourceCollection - Collection type to serialize
-   * @param collection - The Collection resource to serialize
-   * @param container - Optional container resolver for dependency injection
-   * @returns Promise resolving to an array of serialized data
-   */
-  <ResourceCollection extends CollectionContract<any, any, any>>(
-    collection: ResourceCollection,
-    container?: ContainerResolver<any>
-  ): Promise<UnpackAsTopLevelCollection<ResourceCollection>>
-
-  /**
-   * Serializes a Paginator resource into paginated data with metadata.
-   *
-   * @template ResourcePaginator - Paginator type to serialize
-   * @param paginator - The Paginator resource to serialize
-   * @param container - Optional container resolver for dependency injection
-   * @returns Promise resolving to paginated data with metadata
-   */
-  <ResourcePaginator extends PaginatorContract<any, any>>(
-    paginator: ResourcePaginator,
-    container?: ContainerResolver<any>
-  ): Promise<UnpackAsTopLevelPaginator<ResourcePaginator>>
-
-  /**
-   * Serializes any other value by returning it as-is wrapped in a Promise.
-   * This fallback overload handles values that don't match the specific resource types.
-   *
-   * @template Value - The value type to serialize
-   * @param value - The value to serialize
-   * @param container - Optional container resolver for dependency injection
-   * @returns Promise resolving to the original value unchanged
-   */
-  <Value>(value: Value, container?: ContainerResolver<any>): Promise<Value>
 }

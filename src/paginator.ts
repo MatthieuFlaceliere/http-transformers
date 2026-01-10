@@ -17,24 +17,29 @@ import { type UnpackAsTopLevelPaginator } from './types.ts'
  * `BaseTransformer.paginate()` method.
  *
  * @template PaginatorCollection - The collection type containing the data items
- * @template MetaData - The pagination metadata type
  *
- * ```ts
+ * ```typescript
+ * class UserTransformer extends BaseTransformer<User> {
+ *   toObject() {
+ *     return {
+ *       id: this.resource.id,
+ *       name: this.resource.name
+ *     }
+ *   }
+ * }
+ *
  * const paginator = UserTransformer.paginate(
  *   users,
  *   { page: 1, perPage: 10, total: 100 }
  * )
  *
- * const result = await serialize(paginator)
- * // Result: { data: [...], meta: { page: 1, perPage: 10, total: 100 } }
+ * const result = await serializer.serialize(paginator)
+ * // Result: { data: [...], metadata: { page: 1, perPage: 10, total: 100 } }
  * ```
  */
-export class Paginator<
-  PaginatorCollection extends Collection<any, any, any>,
-  MetaData extends Record<string, any>,
-> {
+export class Paginator<PaginatorCollection extends Collection<any, any, any>> {
   /**
-   * Type identifier for the paginator
+   * Type identifier for the paginator instance, used for runtime type discrimination.
    */
   $type: 'paginator' = 'paginator'
 
@@ -42,39 +47,13 @@ export class Paginator<
    * Creates a new Paginator instance. This constructor is typically not called directly.
    * Use `BaseTransformer.paginate()` instead.
    *
-   * @param collection The collection of data to paginate
-   * @param metaData Pagination metadata (page, perPage, total, etc.)
+   * @param collection - The collection of transformed data to paginate
+   * @param metaData - Pagination metadata (page, perPage, total, etc.)
    */
   constructor(
     public collection: PaginatorCollection,
-    public metaData: MetaData
+    public metaData: Record<string, any>
   ) {}
-
-  /**
-   * Updates the pagination metadata with new values. Returns a new Paginator instance
-   * with the updated metadata.
-   *
-   * @param metaData New metadata object or a function that receives current metadata and returns new metadata
-   *
-   * @example
-   * ```ts
-   * const paginator = UserTransformer.paginate(users, { page: 1, total: 100 })
-   *
-   * // Set new metadata
-   * const updated = paginator.setMetaData({ page: 2, total: 150, hasMore: true })
-   *
-   * // Update existing metadata
-   * const incremented = paginator.setMetaData(meta => ({ ...meta, page: meta.page + 1 }))
-   * ```
-   */
-  setMetaData<Value extends Record<string, any>>(
-    metaData: Value | ((data: MetaData) => Value)
-  ): Paginator<PaginatorCollection, Value> {
-    return new Paginator(
-      this.collection,
-      typeof metaData === 'function' ? metaData(this.metaData) : metaData
-    )
-  }
 
   /**
    * Resolves the paginated data by combining the serialized collection
@@ -89,10 +68,10 @@ export class Paginator<
     container: ContainerResolver<any>,
     depth: number,
     maxDepth?: number
-  ): Promise<UnpackAsTopLevelPaginator<this>> {
+  ): Promise<UnpackAsTopLevelPaginator<this, 'data', undefined>> {
     return {
       data: await this.collection.resolve(container, depth, maxDepth),
-      meta: this.metaData,
-    } as unknown as Promise<UnpackAsTopLevelPaginator<this>>
+      metadata: this.metaData,
+    } as unknown as Promise<UnpackAsTopLevelPaginator<this, 'data', undefined>>
   }
 }

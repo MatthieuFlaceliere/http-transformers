@@ -166,6 +166,6 @@ export class Collection<
           maxDepth === -1 ? undefined : (maxDepth ?? this.maxDepth)
         )
       )
-    ) as unknown as Promise<UnpackAsTopLevelCollection<this>>
+    ) as unknown as Promise<UnpackAsTopLevelCollection<this, undefined>>
   }
 }

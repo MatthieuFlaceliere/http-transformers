@@ -164,6 +164,6 @@ export class Item<
       this.variant,
       depth,
       maxDepth === -1 ? undefined : (maxDepth ?? this.maxDepth)
-    ) as unknown as Promise<UnpackAsTopLevelItem<this>>
+    ) as unknown as Promise<UnpackAsTopLevelItem<this, undefined>>
   }
 }
