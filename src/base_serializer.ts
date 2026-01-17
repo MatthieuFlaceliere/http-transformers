@@ -7,7 +7,7 @@
  * file that was distributed with this source code.
  */
 
-import { type ContainerResolver } from '@adonisjs/fold'
+import { Container, type ContainerResolver } from '@adonisjs/fold'
 import { RuntimeException } from '@poppinss/exception'
 
 import { Item } from './resource/item.ts'
@@ -76,14 +76,82 @@ export abstract class BaseSerializer<
   /**
    * Internal method to wrap a value under a specified key.
    *
+   * If no wrapper is provided, returns the value as-is.
+   * Otherwise, wraps the value in an object with the wrapper as the key.
+   *
    * @param value - The value to wrap
-   * @param wrapper - The key name to wrap the value under
+   * @param wrapper - The key name to wrap the value under, or undefined to skip wrapping
+   *
+   * @example
+   * ```typescript
+   * #wrap({ id: 1 }, 'data')
+   * // Returns: { data: { id: 1 } }
+   *
+   * #wrap({ id: 1 }, undefined)
+   * // Returns: { id: 1 }
+   * ```
    */
   #wrap(value: any, wrapper: string | undefined) {
     if (!wrapper) {
       return value
     }
     return { [wrapper]: value }
+  }
+
+  /**
+   * Type guard to check if metadata conforms to the Lucid paginator metadata structure.
+   *
+   * Validates that the metadata object contains all expected pagination fields
+   * used by AdonisJS Lucid ORM paginators.
+   *
+   * @param metaData - The metadata object to check
+   *
+   * @example
+   * ```typescript
+   * const metadata = {
+   *   total: '100',
+   *   perPage: '10',
+   *   currentPage: '1',
+   *   lastPage: '10',
+   *   firstPage: '1',
+   *   firstPageUrl: '/users?page=1',
+   *   lastPageUrl: '/users?page=10',
+   *   nextPageUrl: '/users?page=2',
+   *   previousPageUrl: null
+   * }
+   *
+   * if (this.isLucidPaginatorMetaData(metadata)) {
+   *   // metadata is typed as Lucid paginator metadata
+   *   console.log(metadata.currentPage)
+   * }
+   * ```
+   */
+  protected isLucidPaginatorMetaData(metaData: unknown): metaData is {
+    total: string
+    perPage: string
+    currentPage: string
+    lastPage: string
+    firstPage: string
+    firstPageUrl: string
+    lastPageUrl: string
+    nextPageUrl: string
+    previousPageUrl: string
+  } {
+    if (!metaData || typeof metaData !== 'object' || Array.isArray(metaData)) {
+      return false
+    }
+    const expectedKeys = [
+      'total',
+      'perPage',
+      'currentPage',
+      'lastPage',
+      'firstPage',
+      'firstPageUrl',
+      'lastPageUrl',
+      'nextPageUrl',
+      'previousPageUrl',
+    ]
+    return expectedKeys.every((key) => key in metaData)
   }
 
   /**
@@ -94,7 +162,7 @@ export abstract class BaseSerializer<
    */
   serialize<Data extends Record<string, ResourceDataTypes | PaginatorContract<any>>>(
     data: Data,
-    resolver: ContainerResolver<any>
+    resolver?: ContainerResolver<any>
   ): Promise<UnpackTopLevelValues<Data>>
 
   /**
@@ -105,7 +173,7 @@ export abstract class BaseSerializer<
    */
   serialize<ResourceItem extends ItemContract<any, any, any>>(
     resource: ResourceItem,
-    resolver: ContainerResolver<any>
+    resolver?: ContainerResolver<any>
   ): Promise<UnpackAsTopLevelItem<ResourceItem, Wrappers['Wrap']>>
 
   /**
@@ -116,7 +184,7 @@ export abstract class BaseSerializer<
    */
   serialize<ResourceCollection extends CollectionContract<any, any, any>>(
     collection: ResourceCollection,
-    resolver: ContainerResolver<any>
+    resolver?: ContainerResolver<any>
   ): Promise<UnpackAsTopLevelCollection<ResourceCollection, Wrappers['Wrap']>>
 
   /**
@@ -127,7 +195,7 @@ export abstract class BaseSerializer<
    */
   serialize<ResourcePaginator extends PaginatorContract<any>>(
     paginator: ResourcePaginator,
-    resolver: ContainerResolver<any>
+    resolver?: ContainerResolver<any>
   ): Promise<
     UnpackAsTopLevelPaginator<
       ResourcePaginator,
@@ -142,26 +210,27 @@ export abstract class BaseSerializer<
    * @param value - The value to serialize
    * @param container - Optional container resolver for dependency injection
    */
-  serialize<Value>(value: Value, container: ContainerResolver<any>): Promise<Value>
+  serialize<Value>(value: Value, resolver?: ContainerResolver<any>): Promise<Value>
   serialize(
     data: Record<string, ResourceDataTypes> | Item<any, any, any> | Collection<any, any, any>,
-    resolver: ContainerResolver<any>
+    resolver?: ContainerResolver<any>
   ): Promise<any> {
     if (data === null) {
       throw new RuntimeException('Cannot serialize an item with null value')
     }
 
+    const containerResolver = resolver ?? new Container().createResolver()
     if (data instanceof Item) {
-      return data.resolve(resolver, 0, -1).then((value) => this.#wrap(value, this.wrap))
+      return data.resolve(containerResolver, 0, -1).then((value) => this.#wrap(value, this.wrap))
     }
 
     if (data instanceof Collection) {
-      return data.resolve(resolver, 0, -1).then((value) => this.#wrap(value, this.wrap))
+      return data.resolve(containerResolver, 0, -1).then((value) => this.#wrap(value, this.wrap))
     }
 
     if (data instanceof Paginator) {
       const wrapperKey = this.wrap ?? 'data'
-      return data.resolve(resolver, 0, -1).then((value) => {
+      return data.resolve(containerResolver, 0, -1).then((value) => {
         return {
           [wrapperKey]: value.data,
           metadata: this.definePaginationMetaData(value.metadata),
@@ -170,8 +239,9 @@ export abstract class BaseSerializer<
     }
 
     if (isObject(data)) {
-      return resolveValues(resolver, data, 0, -1)
+      return resolveValues(containerResolver, data, 0, -1)
     }
+
     return data
   }
 }
