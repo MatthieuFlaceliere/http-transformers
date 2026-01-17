@@ -10,6 +10,7 @@
 import { test } from '@japa/runner'
 import { inject } from '@adonisjs/fold'
 import { type InferData } from '../src/types.ts'
+import { type Paginator } from '../src/paginator.ts'
 import { BaseTransformer } from '../src/base_transformer.ts'
 import { apiSerializer, container, wrappedApiSerializer } from './helpers.ts'
 
@@ -1298,7 +1299,7 @@ test.group('Transformer', () => {
       UserTransformer.paginate([user], {
         total: 1,
         currentPage: 1,
-      }).tap((collection) => collection.useVariant('forSelection')),
+      }).useVariant('forSelection'),
       container.createResolver()
     )
     assert.deepEqual(userData, {
@@ -1315,6 +1316,198 @@ test.group('Transformer', () => {
       }[]
       metadata: Record<string, any>
     }>()
+  })
+
+  test('use depth method on paginator', async ({ assert, expectTypeOf }) => {
+    class Email {
+      declare id: number
+      declare email: string
+      declare isVerified: boolean
+    }
+
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare emails?: Email[]
+    }
+
+    class EmailTransformer extends BaseTransformer<Email> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          email: this.resource.email,
+          isVerified: this.resource.isVerified,
+        }
+      }
+    }
+
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          emails: EmailTransformer.transform(this.whenLoaded(this.resource.emails))?.depth(2),
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = 'John Doe'
+    user.emails = [
+      { id: 1, email: 'john@example.com', isVerified: true },
+      { id: 2, email: 'doe@example.com', isVerified: false },
+    ]
+
+    const paginator = UserTransformer.paginate([user], {
+      total: 1,
+      currentPage: 1,
+      perPage: 10,
+    }).depth(3)
+
+    // Verify type inference for depth method
+    expectTypeOf(paginator).toMatchTypeOf<{
+      collection: {
+        maxDepth: 3
+      }
+    }>()
+
+    const userData = await apiSerializer.serialize(paginator, container.createResolver())
+
+    assert.deepEqual(userData, {
+      data: [
+        {
+          id: 1,
+          fullName: 'John Doe',
+          emails: [
+            { id: 1, email: 'john@example.com', isVerified: true },
+            { id: 2, email: 'doe@example.com', isVerified: false },
+          ],
+        },
+      ],
+      metadata: {
+        total: 1,
+        currentPage: 1,
+        perPage: 10,
+      },
+    })
+
+    expectTypeOf(userData).toEqualTypeOf<{
+      data: {
+        id: number
+        fullName: string | null
+        emails?: {
+          id: number
+          email: string
+          isVerified: boolean
+        }[]
+      }[]
+      metadata: Record<string, any>
+    }>()
+  })
+
+  test('chain depth and useVariant methods on paginator', async ({ assert, expectTypeOf }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+
+    class UserTransformer extends BaseTransformer<User> {
+      forSelection() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+        }
+      }
+
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = 'Jane Doe'
+    user.email = 'jane@example.com'
+
+    // Test chaining depth and useVariant
+    const paginator = UserTransformer.paginate([user], {
+      total: 1,
+      currentPage: 1,
+    })
+      .useVariant('forSelection')
+      .depth(2)
+
+    // Verify type inference for chained methods
+    expectTypeOf(paginator).toMatchTypeOf<{
+      collection: {
+        maxDepth: 2
+        variant: 'forSelection'
+      }
+    }>()
+
+    const userData = await apiSerializer.serialize(paginator, container.createResolver())
+
+    assert.deepEqual(userData, {
+      data: [{ id: 1, fullName: 'Jane Doe' }],
+      metadata: {
+        total: 1,
+        currentPage: 1,
+      },
+    })
+
+    expectTypeOf(userData).toEqualTypeOf<{
+      data: {
+        id: number
+        fullName: string | null
+      }[]
+      metadata: Record<string, any>
+    }>()
+  })
+
+  test('verify paginator generic signature', ({ expectTypeOf }) => {
+    class User {
+      declare id: number
+      declare name: string
+    }
+
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          name: this.resource.name,
+        }
+      }
+
+      toSummary() {
+        return {
+          id: this.resource.id,
+        }
+      }
+    }
+
+    const users: User[] = []
+
+    // Test default paginator type
+    const defaultPaginator = UserTransformer.paginate(users, { total: 0 })
+    expectTypeOf(defaultPaginator).toMatchTypeOf<Paginator<UserTransformer, 1, 'toObject'>>()
+
+    // Test with depth changed
+    const withDepth = defaultPaginator.depth(3)
+    expectTypeOf(withDepth).toMatchTypeOf<Paginator<UserTransformer, 3, 'toObject'>>()
+
+    // Test with variant changed
+    const withVariant = defaultPaginator.useVariant('toSummary')
+    expectTypeOf(withVariant).toMatchTypeOf<Paginator<UserTransformer, 1, 'toSummary'>>()
+
+    // Test with both changed
+    const withBoth = defaultPaginator.useVariant('toSummary').depth(4)
+    expectTypeOf(withBoth).toMatchTypeOf<Paginator<UserTransformer, 4, 'toSummary'>>()
   })
 })
 

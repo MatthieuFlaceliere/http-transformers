@@ -9,14 +9,20 @@
 
 import type { ContainerResolver } from '@adonisjs/fold'
 import { type Collection } from './resource/collection.ts'
-import { type UnpackAsTopLevelPaginator } from './types.ts'
+import {
+  type UnpackAsTopLevelPaginator,
+  type ExtractTransformerVariants,
+  type Next,
+} from './types.ts'
 
 /**
  * Represents paginated data that combines a collection of transformed items
  * with pagination metadata. This class is typically created using the
  * `BaseTransformer.paginate()` method.
  *
- * @template PaginatorCollection - The collection type containing the data items
+ * @template Transformer - The transformer class used to transform each item
+ * @template MaxDepth - The maximum depth for nested resource resolution
+ * @template Variant - The variant method name to use for transformation
  *
  * ```typescript
  * class UserTransformer extends BaseTransformer<User> {
@@ -37,7 +43,11 @@ import { type UnpackAsTopLevelPaginator } from './types.ts'
  * // Result: { data: [...], metadata: { page: 1, perPage: 10, total: 100 } }
  * ```
  */
-export class Paginator<PaginatorCollection extends Collection<any, any, any>> {
+export class Paginator<
+  Transformer extends Record<string, any>,
+  MaxDepth extends Next[number],
+  Variant extends string,
+> {
   /**
    * Type identifier for the paginator instance, used for runtime type discrimination.
    */
@@ -51,14 +61,61 @@ export class Paginator<PaginatorCollection extends Collection<any, any, any>> {
    * @param metaData - Pagination metadata (page, perPage, total, etc.)
    */
   constructor(
-    public collection: PaginatorCollection,
+    public collection: Collection<Transformer, MaxDepth, Variant>,
     public metaData: any
   ) {}
 
-  tap<NewCollection extends Collection<any, any, any>>(
-    callback: (collection: PaginatorCollection) => NewCollection
-  ): Paginator<NewCollection> {
-    return new Paginator(callback(this.collection), this.metaData)
+  /**
+   * Specify the maximum depth of nested relationships to be resolved when
+   * serializing the paginated collection.
+   *
+   * This is useful to prevent infinite recursion or to limit the amount of data
+   * fetched for deeply nested relationships. Relationships beyond this depth will
+   * be excluded from the serialized output.
+   *
+   * @param value Maximum depth level for nested transformations (valid values: 1, 2, 3, 4, 5, or 6)
+   *
+   * @example
+   * ```ts
+   * const paginatedPosts = PostTransformer.paginate(posts, { page: 1, total: 100 })
+   *   .depth(2)
+   *
+   * // This allows: posts -> comments -> author (2 levels)
+   * // But excludes: posts -> comments -> author -> profile (3 levels)
+   * ```
+   */
+  depth<T extends Next[number]>(value: T): Paginator<Transformer, T, Variant> {
+    return new Paginator(this.collection.depth(value), this.metaData)
+  }
+
+  /**
+   * Specify which transformer variant method to use for serialization.
+   *
+   * Transformers can define multiple methods (variants) for different representations
+   * of the same data (e.g., toObject, toSummary, toDetailed). This method allows you
+   * to choose which variant to use for this paginated collection.
+   *
+   * @param value Name of the transformer variant method to use (must be a method name that
+   *              returns ResourceData or Promise<ResourceData>)
+   *
+   * @example
+   * ```ts
+   * // Use default toObject variant
+   * const users = UserTransformer.paginate(userData, { page: 1, total: 100 })
+   *
+   * // Use custom toSummary variant for lighter payload
+   * const userSummaries = UserTransformer.paginate(userData, { page: 1, total: 100 })
+   *   .useVariant('toSummary')
+   *
+   * // Use detailed variant for admin view
+   * const detailedUsers = UserTransformer.paginate(userData, { page: 1, total: 100 })
+   *   .useVariant('toDetailed')
+   * ```
+   */
+  useVariant<V extends ExtractTransformerVariants<Transformer>>(
+    value: V
+  ): Paginator<Transformer, MaxDepth, V> {
+    return new Paginator(this.collection.useVariant(value), this.metaData)
   }
 
   /**

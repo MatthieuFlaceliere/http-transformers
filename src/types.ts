@@ -286,21 +286,23 @@ export interface CollectionContract<
  * Contract interface for Paginator instances used in type inference. A Paginator
  * wraps a Collection with additional pagination metadata.
  *
- * @template PaginatorCollection - The collection contract containing the paginated data
- * @template MetaData - The pagination metadata type (page numbers, counts, etc.)
+ * @template Transformer - The transformer class to use for transforming each resource
+ * @template MaxDepth - The maximum depth for nested resource resolution
+ * @template Variant - The variant method name to use for transformation
  *
  * ```typescript
- * const usersPaginator: PaginatorContract<
- *   CollectionContract<UserTransformer, 3, 'toObject'>,
- *   { currentPage: number; total: number }
- * > = {
+ * const usersPaginator: PaginatorContract<UserTransformer, 3, 'toObject'> = {
  *   $type: 'paginator',
  *   collection: usersCollection,
  *   metaData: { currentPage: 1, total: 100 }
  * }
  * ```
  */
-export interface PaginatorContract<PaginatorCollection extends CollectionContract<any, any, any>> {
+export interface PaginatorContract<
+  Transformer extends Record<string, any>,
+  MaxDepth extends Next[number],
+  Variant extends string,
+> {
   /**
    * Discriminator property to identify this as a Paginator type
    */
@@ -308,7 +310,7 @@ export interface PaginatorContract<PaginatorCollection extends CollectionContrac
   /**
    * The collection contract containing the paginated resources
    */
-  collection: PaginatorCollection
+  collection: CollectionContract<Transformer, MaxDepth, Variant>
   /**
    * Pagination metadata (page numbers, total count, etc.)
    */
@@ -536,16 +538,16 @@ export type UnpackAsTopLevelCollection<T, Wrapper extends string | undefined> =
  * @internal
  */
 export type UnpackAsTopLevelPaginator<T, Wrapper extends string, TransformedMetaData> =
-  T extends PaginatorContract<infer Collection>
+  T extends PaginatorContract<infer Transformer, any, infer Variant>
     ? TransformedMetaData extends Record<string, any>
       ? Prettify<
           {
-            [K in Wrapper]: UnpackAsTopLevelCollection<Collection, undefined>
+            [K in Wrapper]: InferData<Transformer, Variant, -1, 0>[]
           } & { metadata: TransformedMetaData }
         >
       : Prettify<
           {
-            [K in Wrapper]: UnpackAsTopLevelCollection<Collection, undefined>
+            [K in Wrapper]: InferData<Transformer, Variant, -1, 0>[]
           } & { metadata: any }
         >
     : never
@@ -583,16 +585,24 @@ export type UnpackValues<Data, MaxDepth extends number, Depth extends number> = 
  */
 export type UnpackTopLevelValues<Data> = Prettify<
   {
-    [K in ExtractDefined<Data>]: Data[K] extends PaginatorContract<infer Collection>
+    [K in ExtractDefined<Data>]: Data[K] extends PaginatorContract<
+      infer Transformer,
+      any,
+      infer Variant
+    >
       ? {
-          data: UnpackAsTopLevelCollection<Collection, undefined>
+          data: InferData<Transformer, Variant, -1, 0>[]
           metadata: any
         }
       : UnpackKeyValue<SplitItm<Data[K]>, -1, 0>
   } & {
-    [K in ExtractUndefined<Data>]?: Data[K] extends PaginatorContract<infer Collection>
+    [K in ExtractUndefined<Data>]?: Data[K] extends PaginatorContract<
+      infer Transformer,
+      any,
+      infer Variant
+    >
       ? {
-          data: UnpackAsTopLevelCollection<Collection, undefined>
+          data: InferData<Transformer, Variant, -1, 0>[]
           metadata: any
         }
       : UnpackKeyValue<SplitItm<Data[K]>, -1, 0>

@@ -160,7 +160,7 @@ export abstract class BaseSerializer<
    * @param data - The resource data record to serialize
    * @param container - Optional container resolver for dependency injection
    */
-  serialize<Data extends Record<string, ResourceDataTypes | PaginatorContract<any>>>(
+  serialize<Data extends Record<string, ResourceDataTypes | PaginatorContract<any, any, any>>>(
     data: Data,
     resolver?: ContainerResolver<any>
   ): Promise<UnpackTopLevelValues<Data>>
@@ -193,7 +193,7 @@ export abstract class BaseSerializer<
    * @param paginator - The Paginator resource to serialize
    * @param container - Optional container resolver for dependency injection
    */
-  serialize<ResourcePaginator extends PaginatorContract<any>>(
+  serialize<ResourcePaginator extends PaginatorContract<any, any, any>>(
     paginator: ResourcePaginator,
     resolver?: ContainerResolver<any>
   ): Promise<

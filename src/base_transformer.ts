@@ -193,7 +193,7 @@ export abstract class BaseTransformer<T> {
     data: ConstructorParameters<Self>[0][],
     metaData: Record<string, any>,
     ...rest: ExtractTransformerRestTypes<ConstructorParameters<Self>>
-  ): Paginator<Collection<InstanceType<Self>, 1, 'toObject'>> {
+  ): Paginator<InstanceType<Self>, 1, 'toObject'> {
     return new Paginator(
       new Collection([data, rest], this, 1, 'toObject', new RuntimeException()),
       metaData
