@@ -67,7 +67,7 @@ export abstract class BaseTransformer<T> {
    */
   static transform<Self extends { new (resource: any, ...rest: any[]): any }>(
     this: Self,
-    data: Maybe<ConstructorParameters<Self>[0]>,
+    data: Maybe<ConstructorParameters<Self>[0] | undefined>,
     ...rest: ExtractTransformerRestTypes<ConstructorParameters<Self>>
   ): Item<InstanceType<Self>, 1, 'toObject'> | undefined
 
@@ -111,7 +111,7 @@ export abstract class BaseTransformer<T> {
    */
   static transform<Self extends { new (resource: any, ...rest: any[]): any }>(
     this: Self,
-    data: Maybe<ConstructorParameters<Self>[0][]>,
+    data: Maybe<ConstructorParameters<Self>[0][] | undefined>,
     ...rest: ExtractTransformerRestTypes<ConstructorParameters<Self>>
   ): Collection<InstanceType<Self>, 1, 'toObject'> | undefined
 
