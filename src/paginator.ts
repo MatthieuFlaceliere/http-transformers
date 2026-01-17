@@ -55,6 +55,12 @@ export class Paginator<PaginatorCollection extends Collection<any, any, any>> {
     public metaData: any
   ) {}
 
+  tap<NewCollection extends Collection<any, any, any>>(
+    callback: (collection: PaginatorCollection) => NewCollection
+  ): Paginator<NewCollection> {
+    return new Paginator(callback(this.collection), this.metaData)
+  }
+
   /**
    * Resolves the paginated data by combining the serialized collection
    * with pagination metadata. This method is typically called internally by

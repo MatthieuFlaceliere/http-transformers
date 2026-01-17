@@ -1265,6 +1265,57 @@ test.group('Transformer', () => {
       metadata: Record<string, any>
     }>()
   })
+
+  test('use collection variant from transformer', async ({ assert, expectTypeOf }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      forSelection() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+        }
+      }
+
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = null
+    user.email = 'foo@bar.com'
+
+    const userData = await apiSerializer.serialize(
+      UserTransformer.paginate([user], {
+        total: 1,
+        currentPage: 1,
+      }).tap((collection) => collection.useVariant('forSelection')),
+      container.createResolver()
+    )
+    assert.deepEqual(userData, {
+      data: [{ id: 1, fullName: null }],
+      metadata: {
+        total: 1,
+        currentPage: 1,
+      },
+    })
+    expectTypeOf(userData).toEqualTypeOf<{
+      data: {
+        id: number
+        fullName: string | null
+      }[]
+      metadata: Record<string, any>
+    }>()
+  })
 })
 
 test.group('Transformer | wrapping', () => {
@@ -1383,7 +1434,7 @@ test.group('Transformer | wrapping', () => {
     })
   })
 
-  test('do and wrap on top-level resources', async ({ assert, expectTypeOf }) => {
+  test('only wrap top-level resources', async ({ assert, expectTypeOf }) => {
     class User {
       declare id: number
       declare fullName: string | null
