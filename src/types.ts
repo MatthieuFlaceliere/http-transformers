@@ -337,7 +337,7 @@ export interface PaginatorContract<
  * ```
  */
 export type ExtractTransformerVariants<Transformer> = Exclude<
-  keyof Transformer,
+  keyof Transformer & string,
   keyof BaseTransformer<any>
 >
 /**
