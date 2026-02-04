@@ -336,14 +336,10 @@ export interface PaginatorContract<
  * type Variants = ExtractTransformerVariants<UserResource> // "toObject" | "toSummary"
  * ```
  */
-export type ExtractTransformerVariants<Transformer> = {
-  [K in keyof Transformer & string]: K extends keyof BaseTransformer<any>
-    ? never
-    : Transformer[K] extends (...args: any[]) => ResourceData | Promise<ResourceData>
-      ? K
-      : never
-}[keyof Transformer & string]
-
+export type ExtractTransformerVariants<Transformer> = Exclude<
+  keyof Transformer,
+  keyof BaseTransformer<any>
+>
 /**
  * Supported resource data types. Collections and Items are supported only
  * at the top-level, since relationships in nested properties will lead
