@@ -19,7 +19,12 @@ import { PostTransformer } from './fixtures/transformers/post.ts'
 import { UserTransformer } from './fixtures/transformers/user.ts'
 import { EmailTransformer } from './fixtures/transformers/email.ts'
 import { ProfileTransformer } from './fixtures/transformers/profile.ts'
-import { type InferVariants, type InferData, type ResourceData } from '../src/types.ts'
+import {
+  type InferVariants,
+  type InferData,
+  type ResourceData,
+  type ExtractTransformerVariants,
+} from '../src/types.ts'
 
 declare module '../src/types.ts' {
   interface ExtendedJSONTypes {
@@ -433,6 +438,12 @@ test.group('Types | Fixtures', () => {
       }
     }>()
     expectTypeOf(emailDataObject).toEqualTypeOf<EmailData>()
+  })
+
+  test('make useVariant type-safe', async ({ expectTypeOf }) => {
+    expectTypeOf<ExtractTransformerVariants<UserTransformer>>().toEqualTypeOf<
+      'basicInfo' | 'toObject'
+    >()
   })
 
   test('infer all variants of a transformer', async ({ expectTypeOf }) => {
