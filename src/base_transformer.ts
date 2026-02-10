@@ -257,12 +257,12 @@ export abstract class BaseTransformer<T> {
   omit<
     Data extends Record<string, any>,
     Keys extends { [K in keyof Data]: Data[K] extends Function ? never : K }[keyof Data],
-  >(data: Data, keys: Keys[] | readonly Keys[]): Exclude<Data, Keys> {
+  >(data: Data, keys: Keys[] | readonly Keys[]): Omit<Data, Keys> {
     const result = { ...data }
     for (const key of keys) {
       delete result[key]
     }
-    return result as Exclude<Data, Keys>
+    return result as Omit<Data, Keys>
   }
 
   /**

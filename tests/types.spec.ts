@@ -509,4 +509,69 @@ test.group('Types | Fixtures', () => {
 
     new CustomPostTransformer(new UserPost())
   })
+
+  test('omit should correctly remove properties from the type', async ({ expectTypeOf }) => {
+    interface TestUser {
+      id: number
+      name: string
+      email: string
+      password: string
+      createdAt: Date
+      internalId: string
+    }
+
+    class TestUserTransformer extends BaseTransformer<TestUser> {
+      toObject() {
+        const result = this.omit(this.resource, ['password', 'internalId'])
+
+        // Verify the omitted properties are correctly typed
+        expectTypeOf(result).toEqualTypeOf<{
+          id: number
+          name: string
+          email: string
+          createdAt: Date
+        }>()
+
+        // Verify password and internalId are not in the type
+        expectTypeOf(result).not.toHaveProperty('password')
+        expectTypeOf(result).not.toHaveProperty('internalId')
+
+        // Verify remaining properties are present with correct types
+        expectTypeOf(result.id).toEqualTypeOf<number>()
+        expectTypeOf(result.name).toEqualTypeOf<string>()
+        expectTypeOf(result.email).toEqualTypeOf<string>()
+        expectTypeOf(result.createdAt).toEqualTypeOf<Date>()
+
+        return result
+      }
+    }
+
+    const user: TestUser = {
+      id: 1,
+      name: 'John',
+      email: 'john@example.com',
+      password: 'secret',
+      createdAt: new Date(),
+      internalId: 'internal-123',
+    }
+
+    const transformer = new TestUserTransformer(user)
+    const output = await apiSerializer.serialize(
+      TestUserTransformer.transform(user),
+      container.createResolver()
+    )
+
+    type TransformerOutput = InferData<typeof transformer>
+
+    // Verify the final output doesn't include omitted properties
+    expectTypeOf<TransformerOutput>().toEqualTypeOf<{
+      id: number
+      name: string
+      email: string
+      createdAt: string
+    }>()
+
+    expectTypeOf(output).not.toHaveProperty('password')
+    expectTypeOf(output).not.toHaveProperty('internalId')
+  })
 })
