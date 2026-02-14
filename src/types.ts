@@ -676,3 +676,17 @@ export type InferVariants<Transformer, MaxDepth extends number = -1, Depth exten
   }[keyof Transformer] &
     string]: InferData<Transformer, O, MaxDepth, Depth>
 }
+
+/**
+ * Tracing data structure for transformer serialization events
+ */
+export type TransformerTracingData = {
+  /** The transformer being traced */
+  transformer: Record<string, any>
+  /** The variant method being called */
+  variant: string
+  /** Current depth level */
+  depth: number
+  /** Maximum depth allowed */
+  maxDepth?: number
+}

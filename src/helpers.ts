@@ -15,6 +15,7 @@ import { Item } from './resource/item.ts'
 import { Paginator } from './paginator.ts'
 import { Collection } from './resource/collection.ts'
 import type { JSONDataTypes, ResourceData } from './types.ts'
+import { transformerResolver } from './tracing_channels.ts'
 
 /**
  * Checks if a value is a plain object, excluding arrays and null values.
@@ -81,7 +82,14 @@ export async function transformAndResolve(
   depth: number,
   maxDepth?: number
 ) {
-  const input = await container.call(transformer, variant)
+  const input = await transformerResolver.tracePromise(
+    (t, v) => container.call(t, v),
+    transformerResolver.hasSubscribers ? { transformer, variant, depth, maxDepth } : undefined,
+    undefined,
+    transformer,
+    variant
+  )
+
   if (!isObject(input)) {
     throw new RuntimeException(
       `Invalid value returned by ${transformer.constructor.name}.${variant}. The returned value must be an object`
