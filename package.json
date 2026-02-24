@@ -20,7 +20,7 @@
   },
   "scripts": {
     "pretest": "npm run lint",
-    "test": "c8 npm run quick:test",
+    "test": "npm run quick:test",
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
