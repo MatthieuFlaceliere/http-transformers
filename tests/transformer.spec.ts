@@ -1779,4 +1779,163 @@ test.group('Transformer | wrapping', () => {
       user: { id: 1, fullName: null, email: 'foo@bar.com' },
     })
   })
+
+  test('serializeWithoutWrapping skips wrapping for an item value', async ({
+    assert,
+    expectTypeOf,
+  }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = null
+    user.email = 'foo@bar.com'
+
+    const userData = await wrappedApiSerializer.serializeWithoutWrapping(
+      UserTransformer.transform(user),
+      container.createResolver()
+    )
+    type UserData = InferData<UserTransformer>
+
+    expectTypeOf(userData).toEqualTypeOf<UserData>()
+    expectTypeOf(userData).toEqualTypeOf<{
+      id: number
+      fullName: string | null
+      email: string
+    }>()
+
+    assert.deepEqual(userData, { id: 1, fullName: null, email: 'foo@bar.com' })
+  })
+
+  test('serializeWithoutWrapping skips wrapping for a collection value', async ({
+    assert,
+    expectTypeOf,
+  }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = null
+    user.email = 'foo@bar.com'
+
+    const userData = await wrappedApiSerializer.serializeWithoutWrapping(
+      UserTransformer.transform([user]),
+      container.createResolver()
+    )
+    type UserData = InferData<UserTransformer>
+
+    expectTypeOf(userData).toEqualTypeOf<UserData[]>()
+    expectTypeOf(userData).toEqualTypeOf<{ id: number; fullName: string | null; email: string }[]>()
+
+    assert.deepEqual(userData, [{ id: 1, fullName: null, email: 'foo@bar.com' }])
+  })
+
+  test('serializeWithoutWrapping skips wrapping for a bare object value', async ({
+    assert,
+    expectTypeOf,
+  }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = null
+    user.email = 'foo@bar.com'
+
+    const userData = await wrappedApiSerializer.serializeWithoutWrapping(
+      {
+        user: UserTransformer.transform(user),
+      },
+      container.createResolver()
+    )
+    type UserData = InferData<UserTransformer>
+
+    expectTypeOf(userData).toEqualTypeOf<{ user: UserData }>()
+    expectTypeOf(userData).toEqualTypeOf<{
+      user: { id: number; fullName: string | null; email: string }
+    }>()
+
+    assert.deepEqual(userData, {
+      user: { id: 1, fullName: null, email: 'foo@bar.com' },
+    })
+  })
+
+  test('serializeWithoutWrapping uses "data" key for paginator', async ({
+    assert,
+    expectTypeOf,
+  }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = null
+    user.email = 'foo@bar.com'
+
+    const userData = await wrappedApiSerializer.serializeWithoutWrapping(
+      UserTransformer.paginate([user], {}),
+      container.createResolver()
+    )
+    type UserData = InferData<UserTransformer>
+
+    expectTypeOf(userData).toEqualTypeOf<{
+      data: UserData[]
+      metadata: { totalItems: number; currentPage: number }
+    }>()
+
+    assert.deepEqual(userData, {
+      data: [{ id: 1, fullName: null, email: 'foo@bar.com' }],
+      metadata: { currentPage: 10, totalItems: 10 },
+    })
+  })
 })

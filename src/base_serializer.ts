@@ -250,4 +250,72 @@ export abstract class BaseSerializer<
 
     return data
   }
+
+  /**
+   * Serializes a record of resource data types without wrapping the output.
+   */
+  serializeWithoutWrapping<
+    Data extends Record<string, ResourceDataTypes | PaginatorContract<any, any, any>>,
+  >(data: Data, resolver?: ContainerResolver<any>): Promise<UnpackTopLevelValues<Data>>
+
+  /**
+   * Serializes an Item resource without wrapping the output.
+   */
+  serializeWithoutWrapping<ResourceItem extends ItemContract<any, any, any>>(
+    resource: ResourceItem,
+    resolver?: ContainerResolver<any>
+  ): Promise<UnpackAsTopLevelItem<ResourceItem, undefined>>
+
+  /**
+   * Serializes a Collection resource without wrapping the output.
+   */
+  serializeWithoutWrapping<ResourceCollection extends CollectionContract<any, any, any>>(
+    collection: ResourceCollection,
+    resolver?: ContainerResolver<any>
+  ): Promise<UnpackAsTopLevelCollection<ResourceCollection, undefined>>
+
+  /**
+   * Serializes a Paginator resource without wrapping the output.
+   */
+  serializeWithoutWrapping<ResourcePaginator extends PaginatorContract<any, any, any>>(
+    paginator: ResourcePaginator,
+    resolver?: ContainerResolver<any>
+  ): Promise<UnpackAsTopLevelPaginator<ResourcePaginator, 'data', Wrappers['PaginationMetaData']>>
+
+  /**
+   * Serializes any other value by returning it as-is wrapped in a Promise.
+   */
+  serializeWithoutWrapping<Value>(value: Value, resolver?: ContainerResolver<any>): Promise<Value>
+  serializeWithoutWrapping(
+    data: Record<string, ResourceDataTypes> | Item<any, any, any> | Collection<any, any, any>,
+    resolver?: ContainerResolver<any>
+  ): Promise<any> {
+    if (data === null) {
+      throw new RuntimeException('Cannot serialize an item with null value')
+    }
+
+    const containerResolver = resolver ?? new Container().createResolver()
+    if (data instanceof Item) {
+      return data.resolve(containerResolver, 0, -1)
+    }
+
+    if (data instanceof Collection) {
+      return data.resolve(containerResolver, 0, -1)
+    }
+
+    if (data instanceof Paginator) {
+      return data.resolve(containerResolver, 0, -1).then((value) => {
+        return {
+          data: value.data,
+          metadata: this.definePaginationMetaData(value.metadata),
+        }
+      })
+    }
+
+    if (isObject(data)) {
+      return resolveValues(containerResolver, data, 0, -1)
+    }
+
+    return data
+  }
 }
