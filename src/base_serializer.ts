@@ -163,7 +163,11 @@ export abstract class BaseSerializer<
   serialize<Data extends Record<string, ResourceDataTypes | PaginatorContract<any, any, any>>>(
     data: Data,
     resolver?: ContainerResolver<any>
-  ): Promise<UnpackTopLevelValues<Data>>
+  ): Promise<
+    Wrappers['Wrap'] extends string
+      ? { [K in Wrappers['Wrap']]: UnpackTopLevelValues<Data> }
+      : UnpackTopLevelValues<Data>
+  >
 
   /**
    * Serializes an Item resource into its plain JavaScript representation.
@@ -239,7 +243,9 @@ export abstract class BaseSerializer<
     }
 
     if (isObject(data)) {
-      return resolveValues(containerResolver, data, 0, -1)
+      return resolveValues(containerResolver, data, 0, -1).then((value) =>
+        this.#wrap(value, this.wrap)
+      )
     }
 
     return data

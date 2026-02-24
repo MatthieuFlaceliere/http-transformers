@@ -1694,4 +1694,89 @@ test.group('Transformer | wrapping', () => {
       },
     })
   })
+
+  test('transform and wrap a bare object value', async ({ assert, expectTypeOf }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = null
+    user.email = 'foo@bar.com'
+
+    const userData = await wrappedApiSerializer.serialize(
+      {
+        user: UserTransformer.transform(user),
+      },
+      container.createResolver()
+    )
+    type UserData = InferData<UserTransformer>
+
+    expectTypeOf(userData).toEqualTypeOf<{
+      data: {
+        user: { id: number; fullName: string | null; email: string }
+      }
+    }>()
+    expectTypeOf(userData).toEqualTypeOf<{ data: { user: UserData } }>()
+
+    assert.deepEqual(userData, {
+      data: {
+        user: { id: 1, fullName: null, email: 'foo@bar.com' },
+      },
+    })
+  })
+
+  test('do not wrap a bare object value when wrap is undefined', async ({
+    assert,
+    expectTypeOf,
+  }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    const user = new User()
+    user.id = 1
+    user.fullName = null
+    user.email = 'foo@bar.com'
+
+    const userData = await apiSerializer.serialize(
+      {
+        user: UserTransformer.transform(user),
+      },
+      container.createResolver()
+    )
+    type UserData = InferData<UserTransformer>
+
+    expectTypeOf(userData).toEqualTypeOf<{ user: UserData }>()
+    expectTypeOf(userData).toEqualTypeOf<{
+      user: { id: number; fullName: string | null; email: string }
+    }>()
+
+    assert.deepEqual(userData, {
+      user: { id: 1, fullName: null, email: 'foo@bar.com' },
+    })
+  })
 })
