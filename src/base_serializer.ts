@@ -189,7 +189,11 @@ export abstract class BaseSerializer<
   serialize<ResourceCollection extends CollectionContract<any, any, any>>(
     collection: ResourceCollection,
     resolver?: ContainerResolver<any>
-  ): Promise<UnpackAsTopLevelCollection<ResourceCollection, Wrappers['Wrap']>>
+  ): Promise<
+    Wrappers['Wrap'] extends string
+      ? UnpackAsTopLevelCollection<ResourceCollection, Wrappers['Wrap']> & { metadata?: never }
+      : UnpackAsTopLevelCollection<ResourceCollection, Wrappers['Wrap']>
+  >
 
   /**
    * Serializes a Paginator resource into paginated data with metadata.

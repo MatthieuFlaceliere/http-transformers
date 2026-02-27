@@ -1574,10 +1574,10 @@ test.group('Transformer | wrapping', () => {
     )
     type UserData = InferData<UserTransformer>
 
-    expectTypeOf(userData).toEqualTypeOf<{ data: UserData[] }>()
-    expectTypeOf(userData).toEqualTypeOf<{
-      data: { id: number; fullName: string | null; email: string }[]
-    }>()
+    expectTypeOf(userData).toEqualTypeOf<{ data: UserData[] } & { metadata?: never }>()
+    expectTypeOf(userData).toEqualTypeOf<
+      { data: { id: number; fullName: string | null; email: string }[] } & { metadata?: never }
+    >()
 
     assert.deepEqual(userData, { data: [{ id: 1, fullName: null, email: 'foo@bar.com' }] })
   })
@@ -1625,6 +1625,51 @@ test.group('Transformer | wrapping', () => {
         totalItems: 10,
       },
     })
+  })
+
+  test('return type is a union when controller returns collection or paginator', async ({
+    expectTypeOf,
+  }) => {
+    class User {
+      declare id: number
+      declare fullName: string | null
+      declare email: string
+    }
+    class UserTransformer extends BaseTransformer<User> {
+      toObject() {
+        return {
+          id: this.resource.id,
+          fullName: this.resource.fullName,
+          email: this.resource.email,
+        }
+      }
+    }
+
+    type UserData = InferData<UserTransformer>
+
+    async function handler(cond: boolean) {
+      if (cond) {
+        return wrappedApiSerializer.serialize(
+          UserTransformer.paginate([new User()], {}),
+          container.createResolver()
+        )
+      }
+      return wrappedApiSerializer.serialize(
+        UserTransformer.transform([new User()]),
+        container.createResolver()
+      )
+    }
+
+    type Result = Awaited<ReturnType<typeof handler>>
+
+    expectTypeOf<Result>().not.toEqualTypeOf<{ data: UserData[] } & { metadata?: never }>()
+    expectTypeOf<Result>().toEqualTypeOf<
+      | ({ data: UserData[] } & { metadata?: never })
+      | {
+          data: UserData[]
+          metadata: { currentPage: number; totalItems: number }
+        }
+    >()
   })
 
   test('only wrap top-level resources', async ({ assert, expectTypeOf }) => {
