@@ -5,7 +5,6 @@ class ApiSerializer extends BaseSerializer<{
   PaginationMetaData: Record<string, any>
 }> {
   wrap: undefined = undefined
-  metadataKey: undefined = undefined
   definePaginationMetaData(metaData: Record<string, any>) {
     return metaData
   }
@@ -19,7 +18,6 @@ class WrappedApiSerializer extends BaseSerializer<{
   }
 }> {
   wrap: 'data' = 'data'
-  metadataKey: undefined = undefined
   definePaginationMetaData(_: unknown): {
     totalItems: number
     currentPage: number

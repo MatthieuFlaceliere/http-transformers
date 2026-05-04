@@ -72,7 +72,7 @@ export abstract class BaseSerializer<
   /**
    * The key name to wrap pagination metadata under. Set to undefined to disable wrapping.
    */
-  abstract metadataKey: Wrappers['MetadataKey']
+  metadataKey: Wrappers['MetadataKey'] | undefined = undefined
 
   /**
    * Transforms raw pagination metadata into the desired format for API responses.
