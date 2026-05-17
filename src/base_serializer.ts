@@ -216,6 +216,7 @@ export abstract class BaseSerializer<
     UnpackAsTopLevelPaginator<
       ResourcePaginator,
       Wrappers['Wrap'] extends string ? Wrappers['Wrap'] : 'data',
+      Wrappers['MetadataKey'] extends string ? Wrappers['MetadataKey'] : 'metadata',
       Wrappers['PaginationMetaData']
     >
   >
@@ -293,7 +294,9 @@ export abstract class BaseSerializer<
   serializeWithoutWrapping<ResourcePaginator extends PaginatorContract<any, any, any>>(
     paginator: ResourcePaginator,
     resolver?: ContainerResolver<any>
-  ): Promise<UnpackAsTopLevelPaginator<ResourcePaginator, 'data', Wrappers['PaginationMetaData']>>
+  ): Promise<
+    UnpackAsTopLevelPaginator<ResourcePaginator, 'data', 'metadata', Wrappers['PaginationMetaData']>
+  >
 
   /**
    * Serializes any other value by returning it as-is wrapped in a Promise.
